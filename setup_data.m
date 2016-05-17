@@ -151,7 +151,8 @@ for iSubj = 1:NSUBJ
 end
 
 %% Load And Process Data
-for iSubj=1%:NSUBJ
+% NOTE: The filenames and field names will not work for all subjects!!!
+for iSubj=1:NSUBJ
     sdir = sprintf('Pt%02d',iSubj);
     sfile = sprintf('namingERP_Pt%02d_refD14.mat',iSubj);
     spath = fullfile(DATA_DIR,sdir,sfile);
