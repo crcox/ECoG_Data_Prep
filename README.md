@@ -132,3 +132,29 @@ dataset. If you set the start of the window to `0` and the size to
 number of milliseconds post stimulus onset.
 
 `WindowSizeInMilliseconds` defines the duration of the time window.
+
+Script output
+-------------
+Because the decisions to average, boxcar average, or define a window
+change the dimensions of the data, each configuration of these values
+can be thought of as creating a new dataset. These choices will be
+codified in a directory tree, such as the one displayed below. Here you
+can see I chose to average over sessions (`avg/`), I boxcar averaged
+with 20 tick bins, and I defined a window that began at 0ms and was
+1000ms long.
+
+```bash
+avg
+└── BoxCar
+    └── 020
+        └── WindowStart
+            └── 0000
+                └── WindowSize
+                    └── 1000
+                        ├── metadata.mat
+                        └── s01.mat
+```
+
+TO DO Items
+===========
+See Issues page.
