@@ -1,4 +1,4 @@
-function setup_data()
+function setup_data(varargin)
     %% Setup
     OVERWRITE = true;
     DATA_DIR = '/mnt/Rogerslab_remote/ECOG';
@@ -13,9 +13,27 @@ function setup_data()
     AverageOverSessions = true;
     BoxCarSize = 10; % If this is greater than 1, this is the number of
                      % subsequent milliseconds that will be averaged together.
-    WindowStartInMilliseconds = 0;  % zero means "window starts at stimulus onset",
+    WindowStartInMilliseconds = 200;  % zero means "window starts at stimulus onset",
                       % one means "window starts one tick post stimulus onset".
     WindowSizeInMilliseconds = 1000;
+
+    if nargin > 1
+      args = reshape(varargin, 2, [])';
+      for iArg = 1:size(args,1)
+        key = args{iArg,1};
+        value = args{iArg,2};
+        switch lower(key)
+        case 'average'
+          AverageOverSessions = value;
+        case 'boxcarsize'
+          BoxCarSize = value;
+        case 'windowstart'
+          WindowStartInMilliseconds = value;
+        case 'windowsize'
+          WindowSizeInMilliseconds = value;
+        end
+      end
+    end
 
     %% Define Output directory
     if AverageOverSessions == 1
