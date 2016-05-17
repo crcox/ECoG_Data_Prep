@@ -28,6 +28,7 @@ stim_key = textscan(fid,'%d %s','Delimiter',',');
 fclose(fid);
 
 nitems = numel(stim_key{2});
+nsessions = numel(unique(stim_order{1}));;
 
 %% ensure stimulus labels are sorted by their index
 [stim_key{1},ix] = sort(stim_key{1});
@@ -136,76 +137,175 @@ for iSubj = 1:NSUBJ
     metadata(iSubj).BoxCarSize = BoxCarSize;
     metadata(iSubj).WindowStartInMilliseconds = WindowStartInMilliseconds;
     metadata(iSubj).WindowSizeInMilliseconds = WindowSizeInMilliseconds;
-    metadata(iSubj).targets = TARGETS;
     metadata(iSubj).filters = FILTERS;
     metadata(iSubj).coords = COORDS;
-    metadata(iSubj).cvind = SCHEMES;
     if AverageOverSessions == 1;
+        for iTarget = 1:numel(TARGETS)
+            switch lower(TARGETS(iTarget).type)
+            case 'category'
+                TARGETS(iTarget).target = repmat(TARGETS(iTarget).target,nsessions,1);
+            case 'similarity'
+                TARGETS(iTarget).target = repmat(TARGETS(iTarget).target,nsessions,nsession);
+            end
+            SCHEMES = repmat(SCHEMES,nsessions,1);
+        end
         metadata(iSubj).sessions = [];
         metadata(iSubj).nrow = 100;
     else
         metadata(iSubj).sessions = stim_order{1};
         metadata(iSubj).nrow = 400;
     end
+    metadata(iSubj).targets = TARGETS;
+    metadata(iSubj).cvind = SCHEMES;
     metadata(iSubj).ncol = 0; % will be set later
 end
 
 %% Load And Process Data
-% NOTE: The filenames and field names will not work for all subjects!!!
-for iSubj=1:NSUBJ
-    sdir = sprintf('Pt%02d',iSubj);
-    sfile = sprintf('namingERP_Pt%02d_refD14.mat',iSubj);
-    spath = fullfile(DATA_DIR,sdir,sfile);
-    fprintf('Loading %s...\n', spath);
-    Pt = load(spath);
-    Pt.LFP = Pt.namingERP_data_PtYK_Pt01_refD14;
-    Pt = rmfield(Pt,'namingERP_data_PtYK_Pt01_refD14');
+% NOTE: In the source data, naming conventions are not consistent. The
+% following structures explicitly represent all the file and field names that
+% need to be referenced.
+% COLUMN KEY:
+%  1. filename
+%  2. variable names
+%  3. sessions per variable
+%  4. format of tag variables
+filelist_hdr = {'filename','varnames','sessions','tagfmt'};
+filelist_raw = {...
+  'namingERP_Pt01.mat',{'namingERP_data_PtYK_Pt01'},{[1,2,3,4]},'tag_ss%02d_all';...
+  'namingERP_Pt02.mat',{'namingERP_data_Pt02'},{[1,2,3,4]},'Tag_ss%02d_all';...
+  'namingERP_Pt03.mat',{'namingERP_data_Pt03'},{[1,2,3,4]},'Tag_ss%02d_all';...
+  [],[],[],[];...
+  'namingERP_Pt05.mat',{'namingERP_data_Pt05'},{[1,2,3,4]},'tag_ss%02d';...
+  'namingERP_Pt06.mat',{'namingERP_data_Pt06'},{[1,2,3,4]},[];...
+  'namingERPdata_Pt07.mat',{'namingERPdataPt07','namingERPdataPt07_ss0304'},{[1,2],[3,4]},'Tag_ss%02d';...
+  'namingERPdata_Pt08.mat',{'namingERPdataPt08'},{[1,2,3,4]},'tag_%02d';...
+  'namingERPdata_Pt09.mat',{'namingERPdataPt09'},{[1,2,3,4]},'tag%02d';...
+  'namingERPdata_Pt10.mat',{'namingERPdataPt10'},{[1,2,3,4]},'tagall%02d';...
+};
+filelist_ref = {...
+  'namingERP_Pt01_refD14.mat',{'namingERP_data_PtYK_Pt01_refD14'},{[1,2,3,4]},'tag_ss%02d_all';...
+  [],[],[],[];...
+  [],[],[],[];...
+  'namingERP_PtMA_REF4.mat',{'namingERP_data_ss01ss02_REF4','namingERP_data_ss03ss04_REF4'},{[1,2],[3,4]},'tag_ss%02d';...
+  'namingERP_Pt05_ref02.mat',{'namingERP_data_Pt05_ref02'},{[1,2,3,4]},'tag_ss%02d_all';...
+  'namingERP_Pt06_ref01.mat',{'namingERP_data_Pt06_ref01'},{[1,2,3,4]},[];...
+  'namingERPdata_Pt07_ref02.mat',{'namingERPdataPt07_ss0102_ref02','namingERPdataPt07_ss0304_ref02'},{[1,2],[3,4]},'Tag_ss%02d';...
+  'namingERPdata_Pt08_ref03.mat',{'namingERPdataPt08_ref03'},{[1,2,3,4]},'tag_%02d';...
+  [],[],[],[];...
+  'namingERPdata_Pt10_ref02.mat',{'namingERPdataPt10_ref02'},{[1,2,3,4]},'tagall%02d';...
+};
 
-    ecoord = ELECTRODE{iSubj};
-    edata = cellstr(Pt.LFP.DIM(2).label);
+for iRef = 1:2
+  if iRef == 1
+    filelist = filelist_raw;
+    fmt = 's%02d_raw.mat';
+  else
+    filelist = filelist_ref;
+    fmt = 's%02d_ref.mat';
+  end
+  for iSubj=1:NSUBJ
+      sdir = sprintf('Pt%02d',iSubj);
+      sfile = filelist{iSubj,1};
+      spath = fullfile(DATA_DIR,sdir,sfile);
+      fprintf('Loading %s...\n', spath);
+      Pt = load(spath);
 
-    zd = ismember(edata, ecoord);
-    zc = ismember(ecoord, edata);
+      nChunks = numel(filelist{iSubj,2});
+      if nChunks > 1
+        nTicks = 0;
+        for iChunk = 1:nChunks
+          cvar = filelist{iSubj,2}{iChunk};
+          nTicks = nTicks + size(Pt.(cvar).DATA,1);
+        end
+        interval = Pt.(cvar).DIM(1).interval;
+        electrodeLabels = Pt.(cvar).DIM(2).label;
+        Pt.LFP = init_source_struct(nTicks,electrodeLabels,interval);
+        for iChunk = 1:nChunks
+          cvar = filelist{iSubj,2}{iChunk};
+          sessions = filelist{iSubj,3}{iChunk};
+          nSessions = numel(sessions);
+          tagfmt = filelist{iSubj,4};
+          if iChunk == 1
+            a = 1;
+            b = size(Pt.(cvar).DATA,1);
+            Pt.LFP.DATA(a:b,:) = Pt.(cvar).DATA;
+            Pt.LFP.DIM(1).scale(a:b) = Pt.(cvar).DIM(1).scale;
+            psize = b;
+            pscale = max(Pt.(cvar).DIM(1).scale);
+            Pt = rmfield(Pt,cvar);
+          else
+            a = psize + 1;
+            b = psize + size(Pt.(cvar).DATA,1);
+            Pt.LFP.DATA(a:b,:) = Pt.(cvar).DATA;
+            Pt.LFP.DIM(1).scale(a:b) = Pt.(cvar).DIM(1).scale + pscale;
 
-    Pt.LFP.DATA = Pt.LFP.DATA(:,zd);
-
-    onsetIndex = {Pt.tag_ss01_all,Pt.tag_ss02_all,Pt.tag_ss03_all,Pt.tag_ss04_all};
-
-    Hz = 1 / Pt.LFP.DIM(1).interval; % ticks per second
-    window_start = (WindowStartInMilliseconds / 1000) * Hz;
-    window_size = (WindowSizeInMilliseconds / 1000) * Hz; % in ticks (where a tick is a single time-step).
-
-    % Will return a session -by- electrode cell array, each containing a
-    % trial -by- time matrix.
-    M = arrangeElectrodeData(Pt.LFP.DATA, onsetIndex, [window_start, window_size]);
-
-    % Sort and average time-points
-    nElectrodes = size(M,2);
-    for iElectrode = 1:nElectrodes
-        for iSession = 1:4
-            M{iSession,iElectrode} = M{iSession,iElectrode}(stim_sort_ix{iSession},:);
-            if BoxCarSize > 1
-                M{iSession,iElectrode} = boxcarmean(M{iSession,iElectrode},BoxCarSize,'KeepPartial',0);
+            for iSession = 1:nSessions
+              tag = sprintf(tagfmt,iSession);
+              Pt.(tag) = Pt.(tag) + psize;
             end
-        end
-        % Average Sessions
-        if AverageOverSessions
-            tmp = cat(3,M{:,iElectrode});
-            M{1,iElectrode} = mean(tmp,3);
-        end
-    end
-    if AverageOverSessions
-        M(2:end,:) = [];
-    end
-    X = cell2mat(M);
-    [~,reduxFilter] = removeOutliers(X);
-    metadata(iSubj).filters(end+1) = struct('label','rowfilter','dimension',1,'filter',reduxFilter.words);
-    metadata(iSubj).filters(end+1) = struct('label','colfilter','dimension',2,'filter',reduxFilter.voxels);
-    metadata(iSubj).ncol = size(X,2);
-    metadata(iSubj).samplingrate = Hz;
 
-    dpath_out = fullfile(DATA_DIR_OUT, sprintf('s%02d.mat',iSubj));
-    save(dpath_out, 'X');
+            psize = b;
+            pscale = max(Pt.(cvar).DIM(1).scale);
+            Pt = rmfield(Pt,cvar);
+          end
+        end
+      else
+        cvar = varnames{1};
+        Pt.LFP = Pt.(cvar);
+        Pt = rmfield(Pt,cvar);
+      end
+
+      ecoord = ELECTRODE{iSubj};
+      edata = cellstr(Pt.LFP.DIM(2).label);
+
+      zd = ismember(edata, ecoord);
+      zc = ismember(ecoord, edata);
+
+      Pt.LFP.DATA = Pt.LFP.DATA(:,zd);
+
+      onsetIndex = cell(1,4);
+      tagfmt = filelist{iSubj,3};
+      for iSession = 1:4
+        tagname = sprintf(tagfmt,iSession);
+        onsetIndex{iSession} = Pt.(tagname);
+      end
+
+      Hz = 1 / Pt.LFP.DIM(1).interval; % ticks per second
+      window_start = (WindowStartInMilliseconds / 1000) * Hz;
+      window_size = (WindowSizeInMilliseconds / 1000) * Hz; % in ticks (where a tick is a single time-step).
+
+      % Will return a session -by- electrode cell array, each containing a
+      % trial -by- time matrix.
+      M = arrangeElectrodeData(Pt.LFP.DATA, onsetIndex, [window_start, window_size]);
+
+      % Sort and average time-points
+      nElectrodes = size(M,2);
+      for iElectrode = 1:nElectrodes
+          for iSession = 1:4
+              M{iSession,iElectrode} = M{iSession,iElectrode}(stim_sort_ix{iSession},:);
+              if BoxCarSize > 1
+                  M{iSession,iElectrode} = boxcarmean(M{iSession,iElectrode},BoxCarSize,'KeepPartial',0);
+              end
+          end
+          % Average Sessions
+          if AverageOverSessions
+              tmp = cat(3,M{:,iElectrode});
+              M{1,iElectrode} = mean(tmp,3);
+          end
+      end
+      if AverageOverSessions
+          M(2:end,:) = [];
+      end
+      X = cell2mat(M);
+      [~,reduxFilter] = removeOutliers(X);
+      metadata(iSubj).filters(end+1) = struct('label','rowfilter','dimension',1,'filter',reduxFilter.words);
+      metadata(iSubj).filters(end+1) = struct('label','colfilter','dimension',2,'filter',reduxFilter.voxels);
+      metadata(iSubj).ncol = size(X,2);
+      metadata(iSubj).samplingrate = Hz;
+
+      dpath_out = fullfile(DATA_DIR_OUT, sprintf(fmt,iSubj));
+      save(dpath_out, 'X');
+  end
 end
 
 %% Save metadata
