@@ -15,6 +15,35 @@ WindowStartInMilliseconds = 0;  % zero means "window starts at stimulus onset",
                   % one means "window starts one tick post stimulus onset".
 WindowSizeInMilliseconds = 1000;
 
+%% Define Output directory
+if AverageOverSessions == 1
+    bdir = 'avg';
+else
+    bdir = 'full';
+end
+DATA_DIR_OUT = fullfile(...
+    '/home/chris/data/ECoG/data',...
+    bdir,...
+    'BoxCar',sprintf('%03d',BoxCarSize),...
+    'WindowStart',sprintf('%04d',WindowStartInMilliseconds),...
+    'WindowSize',sprintf('%04d',WindowSizeInMilliseconds)...
+);
+
+if ~exist(DATA_DIR_OUT,'dir')
+    mkdir(DATA_DIR_OUT)
+end
+
+fprintf('Looking for source ECoG data in:\nt\t%s\n',DATA_DIR);
+fprintf('Looking for stimulus labels and trial orders in:\n\t%s\n',STIM_DIR);
+fprintf('Looking for looking for (basal) label-to-coordinate mapping in:\n\t%s\n',COORD_DIR);
+fprintf('Looking for similarity structures in:\n\t%s\n\n',SIM_DIR);
+
+fprintf('Average over sessions: %d\n', AverageOverSessions);
+fprintf('Box-car size for time-series averaging: %d\n', BoxCarSize);
+fprintf('Beginning of time selection window: %d ms post stim onset\n', WindowStartInMilliseconds);
+fprintf('Length of time window selection: %d ms\n', WindowSizeInMilliseconds);
+fprintf('Processed data will be written to:\n\t%s\n', DATA_DIR_OUT);
+
 %% Read presentation order and stim labels from file
 % All subjects have the same order
 file_stim_order = fullfile(STIM_DIR, 'picture_namingERP_order.csv');
@@ -49,8 +78,10 @@ end
 % NEXT (judge similarity in kind based on word)
 % The rows in the embedding are already in an order that matches the order
 % in the stim_key.
-embedding = csvread(fullfile(STIM_DIR,'NEXT_CK_KIND_5D.csv'));
-plot_similarity_decompositions(embedding);
+embedding = csvread(fullfile(SIM_DIR,'NEXT_CK_KIND_5D.csv'));
+if usejava('jvm')
+  plot_similarity_decompositions(embedding);
+end
 S = corr(embedding','type','Pearson');
 
 %% Check dimensionality of decomposition
@@ -87,23 +118,6 @@ metadata = struct(...
 );
 
 %% Define metadata
-if AverageOverSessions == 1
-    bdir = 'avg';
-else
-    bdir = 'full';
-end
-DATA_DIR_OUT = fullfile(...
-    DATA_DIR,...
-    bdir,...
-    'BoxCar',sprintf('%03d',BoxCarSize),...
-    'WindowStart',sprintf('%04d',WindowStartInMilliseconds),...
-    'WindowSize',sprintf('%04d',WindowSizeInMilliseconds)...
-);
-
-if ~exist(DATA_DIR_OUT,'dir')
-    mkdir(DATA_DIR_OUT)
-end
-
 NSUBJ = numel(SUBJECTS);
 NCOND = 2;
 animate = [zeros(50,1);ones(50,1)];
@@ -214,6 +228,8 @@ for iRef = 1:2
       if isempty(sfile)||isempty(filelist{iSubj,4});
           fprintf('Skipping subject %d, %s because of missing data.\n',iSubj,mode);
           continue;
+        else
+          fprintf('Beginning subject %d, %s.\n',iSubj,mode);
       end
       spath = fullfile(DATA_DIR,sdir,sfile);
       fprintf('Loading %s...\n', spath);
