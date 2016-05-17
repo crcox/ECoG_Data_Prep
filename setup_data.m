@@ -1,6 +1,6 @@
 function setup_data()
     %% Setup
-    OVERWRITE = false;
+    OVERWRITE = true;
     DATA_DIR = '/mnt/Rogerslab_remote/ECOG';
     SRC_DIR = '/home/chris/src/ECoG_Data_Prep';
     STIM_DIR = fullfile(SRC_DIR,'stimuli');
@@ -11,8 +11,8 @@ function setup_data()
     % IMPORTANT: The following 4 variables will effect how the data are
     % processed.
     AverageOverSessions = true;
-    BoxCarSize = 20; % If this is greater than 1, this is the number of
-                     % subsequent time points that will be averaged together.
+    BoxCarSize = 10; % If this is greater than 1, this is the number of
+                     % subsequent milliseconds that will be averaged together.
     WindowStartInMilliseconds = 0;  % zero means "window starts at stimulus onset",
                       % one means "window starts one tick post stimulus onset".
     WindowSizeInMilliseconds = 1000;
@@ -82,7 +82,7 @@ function setup_data()
     % in the stim_key.
     embedding = csvread(fullfile(SIM_DIR,'NEXT_CK_KIND_5D.csv'));
     if usejava('jvm')
-      plot_similarity_decompositions(embedding);
+        plot_similarity_decompositions(embedding);
     end
     S = corr(embedding','type','Pearson');
 
@@ -149,7 +149,7 @@ function setup_data()
             end
         end
 
-        COORDS = struct('orientation','mni','labels',ELECTRODE{iSubj},'ijk',[],'ind',[],'xyz',XYZ{iSubj});
+        COORDS = struct('orientation','mni','labels',{ELECTRODE{iSubj}},'ijk',[],'ind',[],'xyz',XYZ{iSubj});
 
         % ---------
         metadata(iSubj).AverageOverSessions = AverageOverSessions;
@@ -159,6 +159,9 @@ function setup_data()
         metadata(iSubj).filters = FILTERS;
         metadata(iSubj).coords = COORDS;
         if AverageOverSessions == 1;
+            metadata(iSubj).sessions = [];
+            metadata(iSubj).nrow = 100;
+        else
             for iTarget = 1:numel(TARGETS)
                 switch lower(TARGETS(iTarget).type)
                 case 'category'
@@ -168,9 +171,6 @@ function setup_data()
                 end
                 SCHEMES = repmat(SCHEMES,nsessions,1);
             end
-            metadata(iSubj).sessions = [];
-            metadata(iSubj).nrow = 100;
-        else
             metadata(iSubj).sessions = stim_order{1};
             metadata(iSubj).nrow = 400;
         end
@@ -206,7 +206,7 @@ function setup_data()
       [],[],[],[];...
       [],[],[],[];...
       'namingERP_PtMA_REF4.mat',{'namingERP_data_ss01ss02_REF4','namingERP_data_ss03ss04_REF4'},{[1,2],[3,4]},'tag_ss%02d';...
-      'namingERP_Pt05_ref02.mat',{'namingERP_data_Pt05_ref02'},{[1,2,3,4]},'tag_ss%02d_all';...
+      'namingERP_Pt05_ref02.mat',{'namingERP_data_Pt05_ref02'},{[1,2,3,4]},'tag_ss%02d';...
       'namingERP_Pt06_ref01.mat',{'namingERP_data_Pt06_ref01'},{[1,2,3,4]},[];...
       'namingERPdata_Pt07_ref02.mat',{'namingERPdataPt07_ss0102_ref02','namingERPdataPt07_ss0304_ref02'},{[1,2],[3,4]},'Tag_ss%02d';...
       'namingERPdata_Pt08_ref03.mat',{'namingERPdataPt08_ref03'},{[1,2,3,4]},'tag_%02d';...
@@ -215,130 +215,129 @@ function setup_data()
     };
 
     for iRef = 1:2
-      if iRef == 1
-        filelist = filelist_raw;
-        fmt = 's%02d_raw.mat';
-        mode = 'raw';
-      else
-        filelist = filelist_ref;
-        fmt = 's%02d_ref.mat';
-        mode = 'ref';
-      end
-      for iSubj=1:NSUBJ
-          sdir = sprintf('Pt%02d',iSubj);
-          sfile = filelist{iSubj,1};
-          if isempty(sfile)||isempty(filelist{iSubj,4});
-              fprintf('Skipping subject %d, %s because of missing data.\n',iSubj,mode);
-              continue;
+        if iRef == 1
+            filelist = filelist_raw;
+            fmt = 's%02d_raw.mat';
+            mode = 'raw';
+        else
+            filelist = filelist_ref;
+            fmt = 's%02d_ref.mat';
+            mode = 'ref';
+        end
+        for iSubj=1:NSUBJ
+            sdir = sprintf('Pt%02d',iSubj);
+            sfile = filelist{iSubj,1};
+            if isempty(sfile)||isempty(filelist{iSubj,4});
+                fprintf('Skipping subject %d, %s because of missing data.\n',iSubj,mode);
+                continue;
             else
-              fprintf('Beginning subject %d, %s.\n',iSubj,mode);
-          end
-          dpath_out = fullfile(DATA_DIR_OUT, sprintf(fmt,iSubj));
-          if exist(dpath_out,'file') && ~OVERWRITE;
-              fprintf('Skipping subject %d, %s because output already exists.\n',iSubj,mode)
-              continue
-          end
-          spath = fullfile(DATA_DIR,sdir,sfile);
-          fprintf('Loading %s...\n', spath);
-          Pt = load(spath);
-
-          nChunks = numel(filelist{iSubj,2});
-          if nChunks > 1
-            nTicks = 0;
-            for iChunk = 1:nChunks
-              cvar = filelist{iSubj,2}{iChunk};
-              nTicks = nTicks + size(Pt.(cvar).DATA,1);
+                fprintf('Beginning subject %d, %s.\n',iSubj,mode);
             end
-            interval = Pt.(cvar).DIM(1).interval;
-            electrodeLabels = Pt.(cvar).DIM(2).label;
-            Pt.LFP(1) = init_source_struct(nTicks,electrodeLabels,interval);
-            for iChunk = 1:nChunks
-              cvar = filelist{iSubj,2}{iChunk};
-              sessions = filelist{iSubj,3}{iChunk};
-              nSessions = numel(sessions);
-              tagfmt = filelist{iSubj,4};
-              if iChunk == 1
-                a = 1;
-                b = size(Pt.(cvar).DATA,1);
-                Pt.LFP.DATA(a:b,:) = Pt.(cvar).DATA;
-                Pt.LFP.DIM(1).scale(a:b) = Pt.(cvar).DIM(1).scale;
-                psize = b;
-                pscale = max(Pt.(cvar).DIM(1).scale);
-                Pt = rmfield(Pt,cvar);
-              else
-                a = psize + 1;
-                b = psize + size(Pt.(cvar).DATA,1);
-                Pt.LFP.DATA(a:b,:) = Pt.(cvar).DATA;
-                Pt.LFP.DIM(1).scale(a:b) = Pt.(cvar).DIM(1).scale + pscale;
+            dpath_out = fullfile(DATA_DIR_OUT, sprintf(fmt,iSubj));
+            if exist(dpath_out,'file') && ~OVERWRITE;
+                fprintf('Skipping subject %d, %s because output already exists.\n',iSubj,mode)
+                continue
+            end
+            spath = fullfile(DATA_DIR,sdir,sfile);
+            fprintf('Loading %s...\n', spath);
+            Pt = load(spath);
 
-                for iSession = 1:nSessions
-                  tag = sprintf(tagfmt,iSession);
-                  Pt.(tag) = Pt.(tag) + psize;
+            nChunks = numel(filelist{iSubj,2});
+            if nChunks > 1
+                nTicks = 0;
+                for iChunk = 1:nChunks
+                    cvar = filelist{iSubj,2}{iChunk};
+                    nTicks = nTicks + size(Pt.(cvar).DATA,1);
                 end
+                interval = Pt.(cvar).DIM(1).interval;
+                electrodeLabels = Pt.(cvar).DIM(2).label;
+                Pt.LFP(1) = init_source_struct(nTicks,electrodeLabels,interval);
+                for iChunk = 1:nChunks
+                    cvar = filelist{iSubj,2}{iChunk};
+                    sessions = filelist{iSubj,3}{iChunk};
+                    tagfmt = filelist{iSubj,4};
+                    if iChunk == 1
+                        a = 1;
+                        b = size(Pt.(cvar).DATA,1);
+                        Pt.LFP.DATA(a:b,:) = Pt.(cvar).DATA;
+                        Pt.LFP.DIM(1).scale(a:b) = Pt.(cvar).DIM(1).scale;
+                        psize = b;
+                        pscale = max(Pt.(cvar).DIM(1).scale);
+                        Pt = rmfield(Pt,cvar);
+                    else
+                        a = psize + 1;
+                        b = psize + size(Pt.(cvar).DATA,1);
+                        Pt.LFP.DATA(a:b,:) = Pt.(cvar).DATA;
+                        Pt.LFP.DIM(1).scale(a:b) = Pt.(cvar).DIM(1).scale + pscale;
 
-                psize = b;
-                pscale = max(Pt.(cvar).DIM(1).scale);
+                        for iSession = sessions
+                            tag = sprintf(tagfmt,iSession);
+                            Pt.(tag) = Pt.(tag) + psize;
+                        end
+
+                        psize = b;
+                        pscale = max(Pt.(cvar).DIM(1).scale);
+                        Pt = rmfield(Pt,cvar);
+                    end
+                end
+            else
+                cvar = filelist{iSubj,2}{1};
+                Pt.LFP = Pt.(cvar);
                 Pt = rmfield(Pt,cvar);
-              end
             end
-          else
-            cvar = filelist{iSubj,2}{1};
-            Pt.LFP = Pt.(cvar);
-            Pt = rmfield(Pt,cvar);
-          end
 
-          ecoord = ELECTRODE{iSubj};
-          edata = cellstr(Pt.LFP.DIM(2).label);
+            ecoord = ELECTRODE{iSubj};
+            edata = cellstr(Pt.LFP.DIM(2).label);
 
-          zd = ismember(edata, ecoord);
-          zc = ismember(ecoord, edata);
+            zd = ismember(edata, ecoord);
+            zc = ismember(ecoord, edata);
 
-          Pt.LFP.DATA = Pt.LFP.DATA(:,zd);
+            Pt.LFP.DATA = Pt.LFP.DATA(:,zd);
 
-          onsetIndex = cell(1,4);
-          tagfmt = filelist{iSubj,4};
-          for iSession = 1:4
-            tagname = sprintf(tagfmt,iSession);
-            onsetIndex{iSession} = Pt.(tagname);
-          end
+            onsetIndex = cell(1,4);
+            tagfmt = filelist{iSubj,4};
+            for iSession = 1:4
+                tagname = sprintf(tagfmt,iSession);
+                onsetIndex{iSession} = Pt.(tagname);
+            end
 
-          Hz = 1 / Pt.LFP.DIM(1).interval; % ticks per second
-          window_start = (WindowStartInMilliseconds / 1000) * Hz;
-          window_size = (WindowSizeInMilliseconds / 1000) * Hz; % in ticks (where a tick is a single time-step).
+            Hz = 1 / Pt.LFP.DIM(1).interval; % ticks per second
+            boxcar_size = (BoxCarSize / 1000) * Hz;
+            window_start = (WindowStartInMilliseconds / 1000) * Hz;
+            window_size = (WindowSizeInMilliseconds / 1000) * Hz; % in ticks (where a tick is a single time-step).
 
-          % Will return a session -by- electrode cell array, each containing a
-          % trial -by- time matrix.
-          M = arrangeElectrodeData(Pt.LFP.DATA, onsetIndex, [window_start, window_size]);
+            % Will return a session -by- electrode cell array, each containing a
+            % trial -by- time matrix.
+            M = arrangeElectrodeData(Pt.LFP.DATA, onsetIndex, [window_start, window_size]);
 
-          % Sort and average time-points
-          nElectrodes = size(M,2);
-          for iElectrode = 1:nElectrodes
-              for iSession = 1:4
-                  M{iSession,iElectrode} = M{iSession,iElectrode}(stim_sort_ix{iSession},:);
-                  if BoxCarSize > 1
-                      M{iSession,iElectrode} = boxcarmean(M{iSession,iElectrode},BoxCarSize,'KeepPartial',0);
-                  end
-              end
-              % Average Sessions
-              if AverageOverSessions
-                  tmp = cat(3,M{:,iElectrode});
-                  M{1,iElectrode} = mean(tmp,3);
-              end
-          end
-          if AverageOverSessions
-              M(2:end,:) = [];
-          end
-          X = cell2mat(M);
-          [~,reduxFilter] = removeOutliers(X);
-          metadata(iSubj).filters(end+1) = struct('label','rowfilter','dimension',1,'filter',reduxFilter.words);
-          metadata(iSubj).filters(end+1) = struct('label','colfilter','dimension',2,'filter',reduxFilter.voxels);
-          metadata(iSubj).ncol = size(X,2);
-          metadata(iSubj).samplingrate = Hz;
+            % Sort and average time-points
+            nElectrodes = size(M,2);
+            for iElectrode = 1:nElectrodes
+                for iSession = 1:4
+                    M{iSession,iElectrode} = M{iSession,iElectrode}(stim_sort_ix{iSession},:);
+                    if boxcar_size > 1
+                        M{iSession,iElectrode} = boxcarmean(M{iSession,iElectrode},boxcar_size,'KeepPartial',0);
+                    end
+                end
+                % Average Sessions
+                if AverageOverSessions
+                    tmp = cat(3,M{:,iElectrode});
+                    M{1,iElectrode} = mean(tmp,3);
+                end
+            end
+            if AverageOverSessions
+                M(2:end,:) = [];
+            end
+            X = cell2mat(M);
+            [~,reduxFilter] = removeOutliers(X);
+            metadata(iSubj).filters(end+1) = struct('label','rowfilter','dimension',1,'filter',reduxFilter.words);
+            metadata(iSubj).filters(end+1) = struct('label','colfilter','dimension',2,'filter',reduxFilter.voxels);
+            metadata(iSubj).ncol = size(X,2);
+            metadata(iSubj).samplingrate = Hz;
 
-          save(dpath_out, 'X');
-      end
+            save(dpath_out, 'X');
+        end
+      %% Save metadata
+      save(fullfile(DATA_DIR_OUT,sprintf('metadata_%s.mat',mode)),'metadata');
     end
-
-    %% Save metadata
-    save(fullfile(DATA_DIR_OUT,'metadata.mat'));
 end
