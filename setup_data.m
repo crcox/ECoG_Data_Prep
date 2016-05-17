@@ -1,12 +1,15 @@
 %% Setup
 DATA_DIR = '/media/chris/Data/ECOG';
-META_DIR = '/media/chris/Data/ECOG/everything_else';
+SRC_DIR = '/home/chris/src/ECoG_Data_Prep';
+STIM_DIR = fullfile(SRC_DIR,'stimuli');
+COORD_DIR = fullfile(SRC_DIR,'coords');
+SIM_DIR = fullfile(SRC_DIR,'similarity');
 SUBJECTS = 1:10; % subjects 11 and 12 do not have labeled coordinates.
 
 % IMPORTANT: The following 4 variables will effect how the data are
 % processed.
 AverageOverSessions = true;
-BoxCarSize = 20; % If this is greater than 1, this is the number of 
+BoxCarSize = 20; % If this is greater than 1, this is the number of
                  % subsequent time points that will be averaged together.
 WindowStartInMilliseconds = 0;  % zero means "window starts at stimulus onset",
                   % one means "window starts one tick post stimulus onset".
@@ -14,8 +17,8 @@ WindowSizeInMilliseconds = 1000;
 
 %% Read presentation order and stim labels from file
 % All subjects have the same order
-file_stim_order = fullfile(META_DIR, 'picture_namingERP_order.csv');
-file_stim_key = fullfile(META_DIR, 'picture_namingERP_key.csv');
+file_stim_order = fullfile(STIM_DIR, 'picture_namingERP_order.csv');
+file_stim_key = fullfile(STIM_DIR, 'picture_namingERP_key.csv');
 
 fid = fopen(file_stim_order);
 stim_order_head = textscan(fid,'%s %s %s',1,'Delimiter',',');
@@ -46,7 +49,7 @@ end
 % NEXT (judge similarity in kind based on word)
 % The rows in the embedding are already in an order that matches the order
 % in the stim_key.
-embedding = csvread('Similarity/NEXT_CK_KIND_5D.csv');
+embedding = csvread(fullfile(STIM_DIR,'NEXT_CK_KIND_5D.csv'));
 plot_similarity_decompositions(embedding);
 S = corr(embedding','type','Pearson');
 
@@ -59,7 +62,7 @@ fprintf('To approximate S with error tolerance %.2f, %d dimensions are required.
 fprintf('-----\n');
 
 %% Load (basal) coordinates
-[subject,electrode,x,y,z] = importcoordinates('MNI_basal_electrodes_Pt01_10_w_label.csv');
+[subject,electrode,x,y,z] = importcoordinates(fullfile(COORD_DIR,'MNI_basal_electrodes_Pt01_10_w_label.csv'));
 xyz = [x,y,z]; clear x y z
 x = tabulate(subject);
 XYZ = mat2cell(xyz,cell2mat(x(:,2)),3);
@@ -199,13 +202,19 @@ for iRef = 1:2
   if iRef == 1
     filelist = filelist_raw;
     fmt = 's%02d_raw.mat';
+    mode = 'raw';
   else
     filelist = filelist_ref;
     fmt = 's%02d_ref.mat';
+    mode = 'ref';
   end
   for iSubj=1:NSUBJ
       sdir = sprintf('Pt%02d',iSubj);
       sfile = filelist{iSubj,1};
+      if isempty(sfile)||isempty(filelist{iSubj,4});
+          fprintf('Skipping subject %d, %s because of missing data.\n',iSubj,mode);
+          continue;
+      end
       spath = fullfile(DATA_DIR,sdir,sfile);
       fprintf('Loading %s...\n', spath);
       Pt = load(spath);
