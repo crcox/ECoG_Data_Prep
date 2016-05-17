@@ -1,6 +1,7 @@
 function setup_data()
     %% Setup
-    DATA_DIR = '/media/chris/Data/ECOG';
+    OVERWRITE = false;
+    DATA_DIR = '/mnt/Rogerslab_remote/ECOG';
     SRC_DIR = '/home/chris/src/ECoG_Data_Prep';
     STIM_DIR = fullfile(SRC_DIR,'stimuli');
     COORD_DIR = fullfile(SRC_DIR,'coords');
@@ -34,7 +35,7 @@ function setup_data()
         mkdir(DATA_DIR_OUT)
     end
 
-    fprintf('Looking for source ECoG data in:\nt\t%s\n',DATA_DIR);
+    fprintf('Looking for source ECoG data in:\n\t%s\n',DATA_DIR);
     fprintf('Looking for stimulus labels and trial orders in:\n\t%s\n',STIM_DIR);
     fprintf('Looking for looking for (basal) label-to-coordinate mapping in:\n\t%s\n',COORD_DIR);
     fprintf('Looking for similarity structures in:\n\t%s\n\n',SIM_DIR);
@@ -163,7 +164,7 @@ function setup_data()
                 case 'category'
                     TARGETS(iTarget).target = repmat(TARGETS(iTarget).target,nsessions,1);
                 case 'similarity'
-                    TARGETS(iTarget).target = repmat(TARGETS(iTarget).target,nsessions,nsession);
+                    TARGETS(iTarget).target = repmat(TARGETS(iTarget).target,nsessions,nsessions);
                 end
                 SCHEMES = repmat(SCHEMES,nsessions,1);
             end
@@ -232,6 +233,11 @@ function setup_data()
             else
               fprintf('Beginning subject %d, %s.\n',iSubj,mode);
           end
+          dpath_out = fullfile(DATA_DIR_OUT, sprintf(fmt,iSubj));
+          if exist(dpath_out,'file') && ~OVERWRITE;
+              fprintf('Skipping subject %d, %s because output already exists.\n',iSubj,mode)
+              continue
+          end
           spath = fullfile(DATA_DIR,sdir,sfile);
           fprintf('Loading %s...\n', spath);
           Pt = load(spath);
@@ -245,7 +251,7 @@ function setup_data()
             end
             interval = Pt.(cvar).DIM(1).interval;
             electrodeLabels = Pt.(cvar).DIM(2).label;
-            Pt.LFP = init_source_struct(nTicks,electrodeLabels,interval);
+            Pt.LFP(1) = init_source_struct(nTicks,electrodeLabels,interval);
             for iChunk = 1:nChunks
               cvar = filelist{iSubj,2}{iChunk};
               sessions = filelist{iSubj,3}{iChunk};
@@ -276,7 +282,7 @@ function setup_data()
               end
             end
           else
-            cvar = varnames{1};
+            cvar = filelist{iSubj,2}{1};
             Pt.LFP = Pt.(cvar);
             Pt = rmfield(Pt,cvar);
           end
@@ -290,7 +296,7 @@ function setup_data()
           Pt.LFP.DATA = Pt.LFP.DATA(:,zd);
 
           onsetIndex = cell(1,4);
-          tagfmt = filelist{iSubj,3};
+          tagfmt = filelist{iSubj,4};
           for iSession = 1:4
             tagname = sprintf(tagfmt,iSession);
             onsetIndex{iSession} = Pt.(tagname);
@@ -329,7 +335,6 @@ function setup_data()
           metadata(iSubj).ncol = size(X,2);
           metadata(iSubj).samplingrate = Hz;
 
-          dpath_out = fullfile(DATA_DIR_OUT, sprintf(fmt,iSubj));
           save(dpath_out, 'X');
       end
     end
