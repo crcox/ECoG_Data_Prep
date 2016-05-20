@@ -137,61 +137,60 @@ function setup_data(varargin)
       'WindowSizeInMilliseconds',[]...
     );
 
+    % TARGETS
+    animate = [zeros(50,1);ones(50,1)];
+    TARGETS = struct(...
+        'label', {'animate','semantic'},...
+        'type', {'category','similarity'},...
+        'sim_source',{[],'NEXT'},...
+        'sim_metric',{[],'correlation'},...
+        'target',{animate,S}...
+    );
+    if AverageOverSessions == 0;
+        for iTarget = 1:numel(TARGETS)
+            switch lower(TARGETS(iTarget).type)
+            case 'category'
+                TARGETS(iTarget).target = repmat(TARGETS(iTarget).target,nsessions,1);
+            case 'similarity'
+                TARGETS(iTarget).target = repmat(TARGETS(iTarget).target,nsessions,nsessions);
+            end
+            SCHEMES = repmat(SCHEMES,nsessions,1);
+        end
+    end
+    
+    % CV
+    nschemes = 10;
+    nfolds = 10;
+    SCHEMES = zeros(nitems, nschemes);
+    for iScheme = 1:nschemes
+        c = cvpartition(animate,'KFold', nfolds);
+        for iFold = 1:nfolds
+            SCHEMES(:,iScheme) = SCHEMES(:,iScheme) + (test(c, iFold) * iFold);
+        end
+    end
+    
     %% Define metadata
     NSUBJ = numel(SUBJECTS);
     NCOND = 2;
-    animate = [zeros(50,1);ones(50,1)];
     for iSubj = 1:NSUBJ
-        % TARGETS
-        TARGETS = struct(...
-            'label', {'animate','semantic'},...
-            'type', {'category','similarity'},...
-            'sim_source',{[],'NEXT'},...
-            'sim_metric',{[],'correlation'},...
-            'target',{animate,S}...
-        );
-
         % FILTERS
         % This is kind of a place holder. When we remove outliers, we'll want
         % to create filters for that.
         FILTERS = struct('label',[],'dimension',[],'filter',[]);
 
-        % CV
-        nschemes = 10;
-        nfolds = 10;
-        SCHEMES = zeros(nitems, nschemes);
-        for iScheme = 1:nschemes
-            c = cvpartition(animate,'KFold', nfolds);
-            for iFold = 1:nfolds
-                SCHEMES(:,iScheme) = SCHEMES(:,iScheme) + (test(c, iFold) * iFold);
-            end
-        end
-
-        COORDS = struct('orientation','mni','labels',{ELECTRODE{iSubj}},'ijk',[],'ind',[],'xyz',XYZ{iSubj});
-
         % ---------
+        if AverageOverSessions == 1;
+            metadata(iSubj).sessions = [];
+            metadata(iSubj).nrow = 100;
+        else
+            metadata(iSubj).sessions = stim_order{1};
+            metadata(iSubj).nrow = 400;
+        end
         metadata(iSubj).AverageOverSessions = AverageOverSessions;
         metadata(iSubj).BoxCarSize = BoxCarSize;
         metadata(iSubj).WindowStartInMilliseconds = WindowStartInMilliseconds;
         metadata(iSubj).WindowSizeInMilliseconds = WindowSizeInMilliseconds;
         metadata(iSubj).filters = FILTERS;
-        metadata(iSubj).coords = COORDS;
-        if AverageOverSessions == 1;
-            metadata(iSubj).sessions = [];
-            metadata(iSubj).nrow = 100;
-        else
-            for iTarget = 1:numel(TARGETS)
-                switch lower(TARGETS(iTarget).type)
-                case 'category'
-                    TARGETS(iTarget).target = repmat(TARGETS(iTarget).target,nsessions,1);
-                case 'similarity'
-                    TARGETS(iTarget).target = repmat(TARGETS(iTarget).target,nsessions,nsessions);
-                end
-                SCHEMES = repmat(SCHEMES,nsessions,1);
-            end
-            metadata(iSubj).sessions = stim_order{1};
-            metadata(iSubj).nrow = 400;
-        end
         metadata(iSubj).targets = TARGETS;
         metadata(iSubj).cvind = SCHEMES;
         metadata(iSubj).ncol = 0; % will be set later
@@ -310,6 +309,8 @@ function setup_data(varargin)
             zd = ismember(edata, ecoord);
             zc = ismember(ecoord, edata);
 
+            COORDS = struct('orientation','mni','labels',{ELECTRODE{iSubj}(zc)},'ijk',[],'ind',[],'xyz',XYZ{iSubj}(zc,:));
+
             Pt.LFP.DATA = Pt.LFP.DATA(:,zd);
 
             onsetIndex = cell(1,4);
@@ -350,6 +351,7 @@ function setup_data(varargin)
             [~,reduxFilter] = removeOutliers(X);
             metadata(iSubj).filters(end+1) = struct('label','rowfilter','dimension',1,'filter',reduxFilter.words);
             metadata(iSubj).filters(end+1) = struct('label','colfilter','dimension',2,'filter',reduxFilter.voxels);
+            metadata(iSubj).coords = COORDS;
             metadata(iSubj).ncol = size(X,2);
             metadata(iSubj).samplingrate = Hz;
 
