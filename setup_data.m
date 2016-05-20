@@ -31,6 +31,8 @@ function setup_data(varargin)
           WindowStartInMilliseconds = value;
         case 'windowsize'
           WindowSizeInMilliseconds = value;
+        case 'subjects'
+          SUBJECTS = value;
         end
       end
     end
@@ -63,6 +65,8 @@ function setup_data(varargin)
     fprintf('Beginning of time selection window: %d ms post stim onset\n', WindowStartInMilliseconds);
     fprintf('Length of time window selection: %d ms\n', WindowSizeInMilliseconds);
     fprintf('Processed data will be written to:\n\t%s\n', DATA_DIR_OUT);
+    fprintf('Subjects:\n');
+    disp(SUBJECTS)
 
     %% Read presentation order and stim labels from file
     % All subjects have the same order
@@ -172,7 +176,8 @@ function setup_data(varargin)
     %% Define metadata
     NSUBJ = numel(SUBJECTS);
     NCOND = 2;
-    for iSubj = 1:NSUBJ
+    for iSubject = 1:NSUBJ
+        iSubj = SUBJECTS(iSubject);
         % FILTERS
         % This is kind of a place holder. When we remove outliers, we'll want
         % to create filters for that.
@@ -241,7 +246,8 @@ function setup_data(varargin)
             fmt = 's%02d_ref.mat';
             mode = 'ref';
         end
-        for iSubj=1:NSUBJ
+        for iSubject=1:NSUBJ
+            iSubj = SUBJECTS(iSubject);
             sdir = sprintf('Pt%02d',iSubj);
             sfile = filelist{iSubj,1};
             if isempty(sfile)||isempty(filelist{iSubj,4});
@@ -306,8 +312,8 @@ function setup_data(varargin)
             ecoord = ELECTRODE{iSubj};
             edata = cellstr(Pt.LFP.DIM(2).label);
 
-            zd = ismember(edata, ecoord);
-            zc = ismember(ecoord, edata);
+            [zc,zd] = ismember(ecoord, edata);
+            zd = zd(zc);
 
             COORDS = struct('orientation','mni','labels',{ELECTRODE{iSubj}(zc)},'ijk',[],'ind',[],'xyz',XYZ{iSubj}(zc,:));
 
