@@ -144,16 +144,16 @@ function setup_data(varargin)
     % TARGETS
     animate = [zeros(50,1);ones(50,1)];
     TARGETS = struct(...
-        'label', {'animate','semantic'},...
-        'type', {'category','similarity'},...
-        'sim_source',{[],'NEXT'},...
-        'sim_metric',{[],'correlation'},...
+        'label', {'animate','semantic','semantic'},...
+        'type', {'category','similarity','embedding'},...
+        'sim_source',{[],'NEXT','NEXT'},...
+        'sim_metric',{[],'correlation','euclidean'},...
         'target',{animate,S}...
     );
     if AverageOverSessions == 0;
         for iTarget = 1:numel(TARGETS)
             switch lower(TARGETS(iTarget).type)
-            case 'category'
+            case {'category','embedding'}
                 TARGETS(iTarget).target = repmat(TARGETS(iTarget).target,nsessions,1);
             case 'similarity'
                 TARGETS(iTarget).target = repmat(TARGETS(iTarget).target,nsessions,nsessions);
@@ -161,7 +161,7 @@ function setup_data(varargin)
             SCHEMES = repmat(SCHEMES,nsessions,1);
         end
     end
-    
+
     % CV
     nschemes = 10;
     nfolds = 10;
@@ -172,7 +172,7 @@ function setup_data(varargin)
             SCHEMES(:,iScheme) = SCHEMES(:,iScheme) + (test(c, iFold) * iFold);
         end
     end
-    
+
     %% Define metadata
     NSUBJ = numel(SUBJECTS);
     NCOND = 2;
