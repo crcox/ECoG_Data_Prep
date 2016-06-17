@@ -355,8 +355,12 @@ function setup_data(varargin)
             end
             X = cell2mat(M);
             [~,reduxFilter] = removeOutliers(X);
-            metadata(iSubj).filters(end+1) = struct('label','rowfilter','dimension',1,'filter',reduxFilter.words);
-            metadata(iSubj).filters(end+1) = struct('label','colfilter','dimension',2,'filter',reduxFilter.voxels);
+            y = metadata(iSubj).coords(1).xyz(:,2);
+            m = median(y);
+            metadata(iSubj).filters(1) = struct('label','rowfilter','dimension',1,'filter',reduxFilter.words);
+            metadata(iSubj).filters(2) = struct('label','colfilter','dimension',2,'filter',reduxFilter.voxels);
+            metadata(iSubj).filters(3) = struct('label','anterior','dimension',2,'filter',y > m);
+            metadata(iSubj).filters(4) = struct('label','posterior','dimension',2,'filter',y <= m);
             metadata(iSubj).coords = COORDS;
             metadata(iSubj).ncol = size(X,2);
             metadata(iSubj).samplingrate = Hz;
