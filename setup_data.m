@@ -1,7 +1,7 @@
 function setup_data(varargin)
     %% Setup
     OVERWRITE = true;
-    DATA_DIR = '/mnt/Rogerslab_remote/ECOG';
+    DATA_DIR = '/home/chris/MRI/ECOG';
     SRC_DIR = '/home/chris/src/ECoG_Data_Prep';
     STIM_DIR = fullfile(SRC_DIR,'stimuli');
     COORD_DIR = fullfile(SRC_DIR,'coords');
@@ -44,7 +44,7 @@ function setup_data(varargin)
         bdir = 'full';
     end
     DATA_DIR_OUT = fullfile(...
-        '/home/chris/data/ECoG/data',...
+        '/home/chris/MRI/ECOG/data',...
         bdir,...
         'BoxCar',sprintf('%03d',BoxCarSize),...
         'WindowStart',sprintf('%04d',WindowStartInMilliseconds),...
@@ -84,7 +84,7 @@ function setup_data(varargin)
     fclose(fid);
 
     nitems = numel(stim_key{2});
-    nsessions = numel(unique(stim_order{1}));;
+    nsessions = numel(unique(stim_order{1}));
 
     %% ensure stimulus labels are sorted by their index
     [stim_key{1},ix] = sort(stim_key{1});
@@ -102,19 +102,19 @@ function setup_data(varargin)
     % NEXT (judge similarity in kind based on word)
     % The rows in the embedding are already in an order that matches the order
     % in the stim_key.
-    embedding = csvread(fullfile(SIM_DIR,'NEXT_CK_KIND_5D.csv'));
-    if usejava('jvm')
-        plot_similarity_decompositions(embedding);
-    end
-    S = corr(embedding','type','Pearson');
+    % S = csvread(fullfile(SIM_DIR,'LeuvenNorm_cosine_similarity.csv'));
+%     if usejava('jvm')
+%         plot_similarity_decompositions(embedding);
+%     end
+%     S = corr(embedding','type','Pearson');
 
     %% Check dimensionality of decomposition
-    addpath('~/src/WholeBrain_RSA/src');
-    tau = 0.2;
-    [~,r] = sqrt_truncate_r(S, tau);
-    fprintf('-----\n');
-    fprintf('To approximate S with error tolerance %.2f, %d dimensions are required.\n', tau, r);
-    fprintf('-----\n');
+%     addpath('~/src/WholeBrain_RSA/src');
+%     tau = 0.2;
+%     [~,r] = sqrt_truncate_r(S, tau);
+%     fprintf('-----\n');
+%     fprintf('To approximate S with error tolerance %.2f, %d dimensions are required.\n', tau, r);
+%     fprintf('-----\n');
 
     %% Load (basal) coordinates
     [subject,electrode,x,y,z] = importcoordinates(fullfile(COORD_DIR,'MNI_basal_electrodes_Pt01_10_w_label.csv'));
@@ -142,14 +142,62 @@ function setup_data(varargin)
     );
 
     % TARGETS
-    animate = [zeros(50,1);ones(50,1)];
-    TARGETS = struct(...
-        'label', {'animate','semantic','semantic'},...
-        'type', {'category','similarity','embedding'},...
-        'sim_source',{[],'NEXT','NEXT'},...
-        'sim_metric',{[],'correlation','euclidean'},...
-        'target',{animate,S}...
-    );
+    tdir = '/home/chris/src/ECoG_Data_Prep/targets';
+    t_type_fmt = {'category','embedding','similarity'};
+    n_tf = numel(t_type_fmt);
+    for i_tf = 1:n_tf
+      type_fmt = t_type_fmt{i_tf};
+      switch type_fmt
+      case 'category'
+        t_type_categories = list_files(fullfile(tdir,type_fmt));
+        n_c = numel(t_type_categories);
+        for i_c = 1:n_c
+          category_file = fullfile(tdir,type_fmt,t_type_categories{i_c});
+          category_label = strip_extension(t_type_categories{i_c});
+          fid = fopen(category_file);
+          tmp = textscan(fid, '%s %u8','Delimiter',',');
+          category_labels = tmp{1};
+          category_targets = tmp{2};
+          fclose(fid);
+          metadata = installSimilarityStructure(metadata, category_targets, category_labels, category_label, [], []);
+        end
+      case {'embedding','similarity'}
+        t_type_sims = list_dirs(fullfile(tdir,type_fmt));
+        n_ts = numel(t_type_sims);
+        for i_ts = 1:n_ts
+          type_sim = t_type_sims{i_ts};
+          t_sim_sources = list_dirs(fullfile(tdir,type_fmt,type_sim));
+          n_s = numel(t_sim_sources);
+          for i_s = 1:n_s
+            source = t_sim_sources{i_s};
+            t_source_metrics = list_files(fullfile(tdir,type_fmt,type_sim,source));
+            t_source_metrics = t_source_metrics(~strcmp('labels.txt',t_source_metrics));
+            n_m = numel(t_source_metrics);
+            for i_m = 1:n_m
+              metric_file = t_source_metrics{i_m};
+              metric_label = strip_extension(metric_file);
+              structure_file = fullfile(tdir,type_fmt,type_sim,source,metric_file);
+              structure_label_file = fullfile(tdir,type_fmt,type_sim,source,'labels.txt');
+              structure_matrix = csvread(structure_file);
+              fid = fopen(structure_label_file);
+              tmp = textscan(fid, '%s');
+              structure_labels = tmp{1};
+              fclose(fid);
+              metadata = installSimilarityStructure(metadata, structure_matrix, structure_labels, type_sim, source, metric_label);
+            end
+          end
+        end
+      end
+    end
+
+   animate = [ones(50,1);zeros(50,1)];
+%    TARGETS = struct(...
+%        'label', {'animate','semantic','semantic'},...
+%        'type', {'category','similarity','embedding'},...
+%        'sim_source',{[],'NEXT','NEXT'},...
+%        'sim_metric',{[],'correlation','euclidean'},...
+%        'target',{animate,S,embedding}...
+%    );
     if AverageOverSessions == 0;
         for iTarget = 1:numel(TARGETS)
             switch lower(TARGETS(iTarget).type)
@@ -195,8 +243,10 @@ function setup_data(varargin)
         metadata(iSubj).BoxCarSize = BoxCarSize;
         metadata(iSubj).WindowStartInMilliseconds = WindowStartInMilliseconds;
         metadata(iSubj).WindowSizeInMilliseconds = WindowSizeInMilliseconds;
-        metadata(iSubj).filters = FILTERS;
-        metadata(iSubj).targets = TARGETS;
+        if numel(fieldnames(metadata(iSubj).filters)) == 0
+          metadata(iSubj).filters = FILTERS;
+        end
+%         metadata(iSubj).targets = TARGETS; % handled above
         metadata(iSubj).cvind = SCHEMES;
         metadata(iSubj).ncol = 0; % will be set later
     end
@@ -321,7 +371,7 @@ function setup_data(varargin)
 
             onsetIndex = cell(1,4);
             tagfmt = filelist{iSubj,4};
-            for iSession = 1:4
+            for iSession = 1:nsessions
                 tagname = sprintf(tagfmt,iSession);
                 onsetIndex{iSession} = Pt.(tagname);
             end
@@ -355,12 +405,12 @@ function setup_data(varargin)
             end
             X = cell2mat(M);
             [~,reduxFilter] = removeOutliers(X);
-            y = metadata(iSubj).coords(1).xyz(:,2);
+            y = COORDS.xyz(:,2);
             m = median(y);
-            metadata(iSubj).filters(1) = struct('label','rowfilter','dimension',1,'filter',reduxFilter.words);
-            metadata(iSubj).filters(2) = struct('label','colfilter','dimension',2,'filter',reduxFilter.voxels);
-            metadata(iSubj).filters(3) = struct('label','anterior','dimension',2,'filter',y > m);
-            metadata(iSubj).filters(4) = struct('label','posterior','dimension',2,'filter',y <= m);
+            metadata(iSubj) = registerFilter(metadata(iSubj), 'rowfilter', 1, reduxFilter.words);
+            metadata(iSubj) = registerFilter(metadata(iSubj), 'colfilter', 2, reduxFilter.voxels);
+            metadata(iSubj) = registerFilter(metadata(iSubj), 'anterior',  2, y > m);
+            metadata(iSubj) = registerFilter(metadata(iSubj), 'posterior', 2, y <= m);
             metadata(iSubj).coords = COORDS;
             metadata(iSubj).ncol = size(X,2);
             metadata(iSubj).samplingrate = Hz;
