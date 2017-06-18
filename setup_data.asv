@@ -49,9 +49,9 @@ function setup_data(varargin)
         addParameter(p, 'average', '1', @ischar);
         addParameter(p, 'dataroot', '/mnt/sw01-home01/mbmhscc4/scratch/data/Naming_ECoG/avg');
         addParameter(p, 'metaroot', '/mnt/sw01-home01/mbmhscc4/scratch/data/Naming_ECoG/meta');
-        addParameter(p, 'cvpath', []);
+        addParameter(p, 'cvindex', []);
         addParameter(p, 'overwrite', '0');
-        parse(p, varargin{:});
+        parse(p, condition, subjects, holdouts, varargin{:});
         if isempty(p.Results.onset)
             error('A window onset time must be provided.');
         end
@@ -79,22 +79,25 @@ function setup_data(varargin)
         % In this case, arguments can be handled in their expected types
         % (numbers as numbers, etc). The input may be coming directly from
         % the Matlab command line or script, or parsed from a json file.
-        addParameter(p, 'onset',[]);
-        addParameter(p, 'duration',[]);
+        addRequired(p, 'onset');
+        addRequired(p, 'duration');
         addParameter(p, 'subjects', [1:3,5,7:10], @isnumeric);
         addParameter(p, 'boxcar', 0);
         addParameter(p, 'average', 1);
         addParameter(p, 'dataroot', 'D:\ECoG\KyotoNaming\data');
         addParameter(p, 'metaroot', 'C:\Users\mbmhscc4\MATLAB\ECOG\naming\data');
-        addParameter(p, 'cvpath', []);
+        addParameter(p, 'cvindex', []);
         addParameter(p, 'overwrite', 0);
-        if isjsoncfg
+        if jsoncfg
             % Input read from a json file will be represented as a
             % structure. The inputParser cannot handle this structure, and
             % so we need to get the structure into an amenable format.
+            onset = jdat.onset;
+            duration = jdat.duration;
+            jdat = rmfield(jdat, {'onset','duration'});
             varargin = [fieldnames(jdat); struct2cell(jdat)];
         end
-        parse(p, varargin{:});
+        parse(p, onset, duration, varargin{:});
         fprintf('      Window onset (ms): %d\n', p.Results.onset);
         fprintf('   Window duration (ms): %d\n', p.Results.duration);
         fprintf('               subjects: %s\n', strjoin(strsplit(num2str(p.Results.subjects)), ', '));
@@ -109,7 +112,7 @@ function setup_data(varargin)
         WindowSizeInMilliseconds = p.Results.duration;
         BoxCarSize = p.Results.boxcar;
         AverageOverSessions = p.Results.average;
-        OVERWRITE = p.Results.overwrite;
+        OVERWRITE = R.Results.overwrite;
         SUBJECTS = p.Results.subjects;
     end
     DATA_DIR = p.Results.dataroot;
@@ -119,7 +122,6 @@ function setup_data(varargin)
     SIM_DIR = fullfile(META_DIR,'similarity');
     TARGET_DIR = fullfile(META_DIR,'targets');
     CV_DIR = fullfile(META_DIR,'cv');
-    cvpath = p.Results.cvpath;
 
         
     %% Define Output directory
@@ -309,9 +311,7 @@ function setup_data(varargin)
         if exist(cvpath, 'file')
             load(cvpath, 'CV');
         else
-            cvfile = cvpath;
-            cvpath = fullfile(CV_DIR, cvfile);
-            load(cvpath, 'CV');
+            cvpath = fi
         end
         SCHEMES = CV;
     end

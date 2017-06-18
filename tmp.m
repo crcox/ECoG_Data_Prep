@@ -1,5 +1,5 @@
 function metadata = tmp()
-  SRC_DIR = '/home/chris/src/ECoG_Data_Prep';
+  SRC_DIR = 'C:\Users\mbmhscc4\MATLAB\src\ECoG_Data_Prep';
   STIM_DIR = fullfile(SRC_DIR,'stimuli');
   %% Read presentation order and stim labels from file
   % All subjects have the same order
