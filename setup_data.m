@@ -72,7 +72,7 @@ function setup_data(varargin)
         WindowSizeInMilliseconds = str2double(p.Results.duration);
         BoxCarSize = str2double(p.Results.boxcar);
         AverageOverSessions = str2double(p.Results.average);
-        OVERWRITE = str2double(R.Results.overwrite);
+        OVERWRITE = str2double(p.Results.overwrite);
         clean_string = regexprep(p.Results.subjects, ',? *', ' ');
         SUBJECTS = str2double(strsplit(clean_string));
     else
