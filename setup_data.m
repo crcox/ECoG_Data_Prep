@@ -24,7 +24,7 @@ function setup_data(varargin)
         % arguments are provided at the command line and parse as such.
         jsonpath = [];
     end
-    
+
     % If nargin < 2, jsonpath will be set to something. It may not be a
     % valid file, so 'jsonload()' may result in a fatal error.
     if isempty(jsonpath);
@@ -33,7 +33,7 @@ function setup_data(varargin)
         jdat = loadjson(jsonpath);
         isjsoncfg = true;
     end
-    
+
     % Input is handled differently depending on how it is input and whether
     % the program is being run from a Unix/Windows terminal or within
     % Matlab propper. isdeployed() checks whether the program is being run
@@ -41,12 +41,13 @@ function setup_data(varargin)
     p = inputParser();
     if isdeployed && ~isjsoncfg
         % In this case, all arguments must be handled as strings, since
-        % they will be passed directly from the Unix/Windows terminal. 
+        % they will be passed directly from the Unix/Windows terminal.
         addParameter(p, 'onset',[]);
         addParameter(p, 'duration',[]);
         addParameter(p, 'subjects', '1 2 3 5 7 8 9 10', @ischar);
         addParameter(p, 'boxcar', '0', @ischar);
         addParameter(p, 'average', '1', @ischar);
+        addParameter(p, 'datacode', 'raw', @ischar);
         addParameter(p, 'dataroot', '/mnt/sw01-home01/mbmhscc4/scratch/data/Naming_ECoG/avg');
         addParameter(p, 'metaroot', '/mnt/sw01-home01/mbmhscc4/scratch/data/Naming_ECoG/meta');
         addParameter(p, 'cvpath', []);
@@ -66,7 +67,7 @@ function setup_data(varargin)
         fprintf(' Data root (for output): %s\n', p.Results.dataroot);
         fprintf('  Meta root (for input): %s\n', p.Results.metaroot);
         fprintf('Overwrite existing data: %s\n', p.Results.overwrite);
-        
+
         %% Setup
         WindowStartInMilliseconds = str2double(p.Results.onset);
         WindowSizeInMilliseconds = str2double(p.Results.duration);
@@ -84,6 +85,7 @@ function setup_data(varargin)
         addParameter(p, 'subjects', [1:3,5,7:10], @isnumeric);
         addParameter(p, 'boxcar', 0);
         addParameter(p, 'average', 1);
+        addParameter(p, 'datacode', 'raw', @ischar);
         addParameter(p, 'dataroot', 'D:\ECoG\KyotoNaming\data');
         addParameter(p, 'metaroot', 'C:\Users\mbmhscc4\MATLAB\ECOG\naming\data');
         addParameter(p, 'cvpath', []);
@@ -103,7 +105,7 @@ function setup_data(varargin)
         fprintf(' Data root (for output): %s\n', p.Results.dataroot);
         fprintf('  Meta root (for input): %s\n', p.Results.metaroot);
         fprintf('Overwrite existing data: %d\n', p.Results.overwrite);
-        
+
         %% Setup
         WindowStartInMilliseconds = p.Results.onset;
         WindowSizeInMilliseconds = p.Results.duration;
@@ -120,17 +122,18 @@ function setup_data(varargin)
     TARGET_DIR = fullfile(META_DIR,'targets');
     CV_DIR = fullfile(META_DIR,'cv');
     cvpath = p.Results.cvpath;
+    datacode = p.Results.datacode;
 
-        
+
     %% Define Output directory
     if AverageOverSessions == 1
-        bdir = 'avg';
+        base_dir = 'avg';
     else
-        bdir = 'full';
+        base_dir = 'full';
     end
     DATA_DIR_OUT = fullfile(...
         DATA_DIR,...
-        bdir,...
+        base_dir,...
         'BoxCar',sprintf('%03d',BoxCarSize),...
         'WindowStart',sprintf('%04d',WindowStartInMilliseconds),...
         'WindowSize',sprintf('%04d',WindowSizeInMilliseconds)...
@@ -171,7 +174,7 @@ function setup_data(varargin)
     nitems = numel(stim_key{2});
     nsessions = numel(unique(stim_order{1}));
 
-    %% ensure stimulus labels are sorted by their index
+    %% Ensure stimulus labels are sorted by their index
     [stim_key{1},ix] = sort(stim_key{1});
     stim_key{2} = stim_key{2}(ix);
 
@@ -182,24 +185,6 @@ function setup_data(varargin)
     for i = 1:size(x,1)
         [~,stim_sort_ix{i}] = sort(stim_order_ix{i});
     end
-
-    %% load similarity structure
-    % NEXT (judge similarity in kind based on word)
-    % The rows in the embedding are already in an order that matches the order
-    % in the stim_key.
-    % S = csvread(fullfile(SIM_DIR,'LeuvenNorm_cosine_similarity.csv'));
-%     if usejava('jvm')
-%         plot_similarity_decompositions(embedding);
-%     end
-%     S = corr(embedding','type','Pearson');
-
-    %% Check dimensionality of decomposition
-%     addpath('~/src/WholeBrain_RSA/src');
-%     tau = 0.2;
-%     [~,r] = sqrt_truncate_r(S, tau);
-%     fprintf('-----\n');
-%     fprintf('To approximate S with error tolerance %.2f, %d dimensions are required.\n', tau, r);
-%     fprintf('-----\n');
 
     %% Load (basal) coordinates
     [subject,electrode,x,y,z] = importcoordinates(fullfile(COORD_DIR,'MNI_basal_electrodes_Pt01_10_w_label.csv'));
@@ -230,51 +215,51 @@ function setup_data(varargin)
     t_type_fmt = {'category','embedding','similarity'};
     n_tf = numel(t_type_fmt);
     for i_tf = 1:n_tf
-      type_fmt = t_type_fmt{i_tf};
-      switch type_fmt
-      case 'category'
-        t_type_categories = list_files(fullfile(TARGET_DIR,type_fmt));
-        n_c = numel(t_type_categories);
-        for i_c = 1:n_c
-          category_file = fullfile(TARGET_DIR,type_fmt,t_type_categories{i_c});
-          category_label = strip_extension(t_type_categories{i_c});
-          fid = fopen(category_file);
-          tmp = textscan(fid, '%s %u8','Delimiter',',');
-          category_labels = tmp{1};
-          category_targets = tmp{2};
-          fclose(fid);
-          metadata = installCategoryStructure(metadata, category_targets, category_labels, category_label, []);
+        type_fmt = t_type_fmt{i_tf};
+        switch type_fmt
+            case 'category'
+                t_type_categories = list_files(fullfile(TARGET_DIR,type_fmt));
+                n_c = numel(t_type_categories);
+                for i_c = 1:n_c
+                    category_file = fullfile(TARGET_DIR,type_fmt,t_type_categories{i_c});
+                    category_label = strip_extension(t_type_categories{i_c});
+                    fid = fopen(category_file);
+                    tmp = textscan(fid, '%s %u8','Delimiter',',');
+                    category_labels = tmp{1};
+                    category_targets = tmp{2};
+                    fclose(fid);
+                    metadata = installCategoryStructure(metadata, category_targets, category_labels, category_label, []);
+                end
+            case {'embedding','similarity'}
+                t_type_sims = list_dirs(fullfile(TARGET_DIR,type_fmt));
+                n_ts = numel(t_type_sims);
+                for i_ts = 1:n_ts
+                    type_sim = t_type_sims{i_ts};
+                    t_sim_sources = list_dirs(fullfile(TARGET_DIR,type_fmt,type_sim));
+                    n_s = numel(t_sim_sources);
+                    for i_s = 1:n_s
+                        source = t_sim_sources{i_s};
+                        t_source_metrics = list_files(fullfile(TARGET_DIR,type_fmt,type_sim,source));
+                        t_source_metrics = t_source_metrics(~strcmp('labels.txt',t_source_metrics));
+                        n_m = numel(t_source_metrics);
+                        for i_m = 1:n_m
+                            metric_file = t_source_metrics{i_m};
+                            metric_label = strip_extension(metric_file);
+                            structure_file = fullfile(TARGET_DIR,type_fmt,type_sim,source,metric_file);
+                            structure_label_file = fullfile(TARGET_DIR,type_fmt,type_sim,source,'labels.txt');
+                            structure_matrix = csvread(structure_file);
+                            fid = fopen(structure_label_file);
+                            tmp = textscan(fid, '%s');
+                            structure_labels = tmp{1};
+                            fclose(fid);
+                            metadata = installSimilarityStructure(metadata, structure_matrix, structure_labels, type_sim, source, metric_label);
+                        end
+                    end
+                end
         end
-      case {'embedding','similarity'}
-        t_type_sims = list_dirs(fullfile(TARGET_DIR,type_fmt));
-        n_ts = numel(t_type_sims);
-        for i_ts = 1:n_ts
-          type_sim = t_type_sims{i_ts};
-          t_sim_sources = list_dirs(fullfile(TARGET_DIR,type_fmt,type_sim));
-          n_s = numel(t_sim_sources);
-          for i_s = 1:n_s
-            source = t_sim_sources{i_s};
-            t_source_metrics = list_files(fullfile(TARGET_DIR,type_fmt,type_sim,source));
-            t_source_metrics = t_source_metrics(~strcmp('labels.txt',t_source_metrics));
-            n_m = numel(t_source_metrics);
-            for i_m = 1:n_m
-              metric_file = t_source_metrics{i_m};
-              metric_label = strip_extension(metric_file);
-              structure_file = fullfile(TARGET_DIR,type_fmt,type_sim,source,metric_file);
-              structure_label_file = fullfile(TARGET_DIR,type_fmt,type_sim,source,'labels.txt');
-              structure_matrix = csvread(structure_file);
-              fid = fopen(structure_label_file);
-              tmp = textscan(fid, '%s');
-              structure_labels = tmp{1};
-              fclose(fid);
-              metadata = installSimilarityStructure(metadata, structure_matrix, structure_labels, type_sim, source, metric_label);
-            end
-          end
-        end
-      end
     end
 
-   animate = [ones(50,1);zeros(50,1)];
+	animate = [ones(50,1);zeros(50,1)];
 %    TARGETS = struct(...
 %        'label', {'animate','semantic','semantic'},...
 %        'type', {'category','similarity','embedding'},...
@@ -316,204 +301,230 @@ function setup_data(varargin)
         SCHEMES = CV;
     end
 
-
     %% Define metadata
     NSUBJ = numel(SUBJECTS);
-    NCOND = 2;
     for iSubject = 1:NSUBJ
-        iSubj = SUBJECTS(iSubject);
+        M = selectbyfield(metadata, 'subject', SUBJECTS(iSubject));
         % FILTERS
         % This is kind of a place holder. When we remove outliers, we'll want
         % to create filters for that.
         FILTERS = struct('label',[],'dimension',[],'filter',[]);
-
         % ---------
         if AverageOverSessions == 1;
-            metadata(iSubj).sessions = [];
-            metadata(iSubj).nrow = 100;
+            M.sessions = [];
+            M.nrow = 100;
         else
-            metadata(iSubj).sessions = stim_order{1};
-            metadata(iSubj).nrow = 400;
+            M.sessions = stim_order{1};
+            M.nrow = 400;
         end
-        metadata(iSubj).AverageOverSessions = AverageOverSessions;
-        metadata(iSubj).BoxCarSize = BoxCarSize;
-        metadata(iSubj).WindowStartInMilliseconds = WindowStartInMilliseconds;
-        metadata(iSubj).WindowSizeInMilliseconds = WindowSizeInMilliseconds;
+        M.AverageOverSessions = AverageOverSessions;
+        M.BoxCarSize = BoxCarSize;
+        M.WindowStartInMilliseconds = WindowStartInMilliseconds;
+        M.WindowSizeInMilliseconds = WindowSizeInMilliseconds;
         if numel(fieldnames(metadata(iSubject).filters)) == 0
-          metadata(iSubj).filters = FILTERS;
+            M.filters = FILTERS;
         end
 %         metadata(iSubj).targets = TARGETS; % handled above
-        metadata(iSubj).cvind = SCHEMES;
-        metadata(iSubj).ncol = 0; % will be set later
+        M.cvind = SCHEMES;
+        M.ncol = 0; % will be set later
+        metadata = replacebyfield(metadata, M, 'subject', SUBJECTS(iSubject));
     end
 
     %% Load And Process Data
     % NOTE: In the source data, naming conventions are not consistent. The
     % following structures explicitly represent all the file and field names that
     % need to be referenced.
-    % COLUMN KEY:
-    %  1. filename
-    %  2. variable names
-    %  3. sessions per variable
-    %  4. format of tag variables
-    filelist_hdr = {'filename','varnames','sessions','tagfmt'};
-    filelist_raw = {...
-      'namingERP_Pt01.mat',{'namingERP_data_PtYK_Pt01'},{[1,2,3,4]},'tag_ss%02d_all';...
-      'namingERP_Pt02.mat',{'namingERP_data_Pt02'},{[1,2,3,4]},'Tag_ss%02d_all';...
-      'namingERP_Pt03.mat',{'namingERP_data_Pt03'},{[1,2,3,4]},'Tag_ss%02d_all';...
-      [],[],[],[];...
-      'namingERP_Pt05.mat',{'namingERP_data_Pt05'},{[1,2,3,4]},'tag_ss%02d';...
-      'namingERP_Pt06.mat',{'namingERP_data_Pt06'},{[1,2,3,4]},[];...
-      'namingERP_Pt07.mat',{'namingERPdataPt07','namingERPdataPt07_ss0304'},{[1,2],[3,4]},'Tag_ss%02d';...
-      'namingERP_Pt08.mat',{'namingERPdataPt08'},{[1,2,3,4]},'tag_%02d';...
-      'namingERP_Pt09.mat',{'namingERPdataPt09'},{[1,2,3,4]},'tag%02d';...
-      'namingERP_Pt10.mat',{'namingERPdataPt10'},{[1,2,3,4]},'tagall%02d';...
-    };
-%     filelist_ref = {...
-%       'namingERP_Pt01_refD14.mat',{'namingERP_data_PtYK_Pt01_refD14'},{[1,2,3,4]},'tag_ss%02d_all';...
-%       [],[],[],[];...
-%       [],[],[],[];...
-%       'namingERP_PtMA_REF4.mat',{'namingERP_data_ss01ss02_REF4','namingERP_data_ss03ss04_REF4'},{[1,2],[3,4]},'tag_ss%02d';...
-%       'namingERP_Pt05_ref02.mat',{'namingERP_data_Pt05_ref02'},{[1,2,3,4]},'tag_ss%02d';...
-%       'namingERP_Pt06_ref01.mat',{'namingERP_data_Pt06_ref01'},{[1,2,3,4]},[];...
-%       'namingERPdata_Pt07_ref02.mat',{'namingERPdataPt07_ss0102_ref02','namingERPdataPt07_ss0304_ref02'},{[1,2],[3,4]},'Tag_ss%02d';...
-%       'namingERPdata_Pt08_ref03.mat',{'namingERPdataPt08_ref03'},{[1,2,3,4]},'tag_%02d';...
-%       [],[],[],[];...
-%       'namingERPdata_Pt10_ref02.mat',{'namingERPdataPt10_ref02'},{[1,2,3,4]},'tagall%02d';...
-%     };
+    filelist = struct('subject',num2cell(1:10), 'filename',[], 'variables', [], 'sessions', [], 'sessiontag', []);
+    switch datacode
+        % This bit is necessary because the raw data were not stored with a
+        % consistent naming convention.
+        case 'raw'
+            % Subject 1
+            filelist(1).filename = 'namingERP_Pt01.mat';
+            filelist(1).variables = {'namingERP_data_PtYK_Pt01'};
+            filelist(1).sessions = {1:4};
+            filelist(1).sessiontag = 'tag_ss%02d_all';
+            % Subject 2
+            filelist(2).filename = 'namingERP_Pt02.mat';
+            filelist(2).variables = {'namingERP_data_Pt02'};
+            filelist(2).sessions = {1:4};
+            filelist(2).sessiontag = 'Tag_ss%02d_all';
+            % Subject 3
+            filelist(3).filename = 'namingERP_Pt03.mat';
+            filelist(3).variables = {'namingERP_data_Pt03'};
+            filelist(3).sessions = {1:4};
+            filelist(3).sessiontag = 'Tag_ss%02d_all';
+            % Subject 4
+            filelist(4).filename = [];
+            filelist(4).variables = [];
+            filelist(4).sessions = [];
+            filelist(4).sessiontag = [];
+            % Subject 5
+            filelist(5).filename = 'namingERP_Pt05.mat';
+            filelist(5).variables = {'namingERP_data_Pt05'};
+            filelist(5).sessions = {1:4};
+            filelist(5).sessiontag = 'tag_ss%02d';
+            % Subject 6
+            filelist(6).filename = 'namingERP_Pt06.mat';
+            filelist(6).variables = {'namingERP_data_Pt06'};
+            filelist(6).sessions = {1:4};
+            filelist(6).sessiontag = [];
+            % Subject 7
+            filelist(7).filename = 'namingERP_Pt07.mat';
+            filelist(7).variables = {'namingERPdataPt07','namingERPdataPt07_ss0304'};
+            filelist(7).sessions = {1:2,3:4};
+            filelist(7).sessiontag = 'Tag_ss%02d';
+            % Subject 8
+            filelist(8).filename = 'namingERP_Pt08.mat';
+            filelist(8).variables = {'namingERPdataPt08'};
+            filelist(8).sessions = {1:4};
+            filelist(8).sessiontag = 'tag_%02d';
+            % Subject 9
+            filelist(9).filename = 'namingERP_Pt09.mat';
+            filelist(9).variables = {'namingERPdataPt09'};
+            filelist(9).sessions = {1:4};
+            filelist(9).sessiontag = 'tag%02d';
+            % Subject 10
+            filelist(10).filename = 'namingERP_Pt01.mat';
+            filelist(10).variables = {'namingERP_data_PtYK_Pt01'};
+            filelist(10).sessions = {1:4};
+            filelist(10).sessiontag = 'tagall%02d';
+        case 'ref'
+        %     filelist_ref = {...
+        %       'namingERP_Pt01_refD14.mat',{'namingERP_data_PtYK_Pt01_refD14'},{[1,2,3,4]},'tag_ss%02d_all';...
+        %       [],[],[],[];...
+        %       [],[],[],[];...
+        %       'namingERP_PtMA_REF4.mat',{'namingERP_data_ss01ss02_REF4','namingERP_data_ss03ss04_REF4'},{[1,2],[3,4]},'tag_ss%02d';...
+        %       'namingERP_Pt05_ref02.mat',{'namingERP_data_Pt05_ref02'},{[1,2,3,4]},'tag_ss%02d';...
+        %       'namingERP_Pt06_ref01.mat',{'namingERP_data_Pt06_ref01'},{[1,2,3,4]},[];...
+        %       'namingERPdata_Pt07_ref02.mat',{'namingERPdataPt07_ss0102_ref02','namingERPdataPt07_ss0304_ref02'},{[1,2],[3,4]},'Tag_ss%02d';...
+        %       'namingERPdata_Pt08_ref03.mat',{'namingERPdataPt08_ref03'},{[1,2,3,4]},'tag_%02d';...
+        %       [],[],[],[];...
+        %       'namingERPdata_Pt10_ref02.mat',{'namingERPdataPt10_ref02'},{[1,2,3,4]},'tagall%02d';...
+        %     };
+    end
 
-    for iRef = 1%:2
-        if iRef == 1
-            filelist = filelist_raw;
-            fmt = 's%02d_raw.mat';
-            mode = 'raw';
+    for iSubject=1:NSUBJ
+        s = SUBJECTS(iSubject);
+        iSubj = SUBJECTS(iSubject);
+        sdir = sprintf('Pt%02d',iSubj);
+        F = selectbyfield(filelist, 'subject', s);
+        if any(cellfun('isempty', struct2cell(F)))
+            fprintf('Skipping subject %d, %s because of missing data.\n',iSubj,datacode);
+            continue
         else
-            filelist = filelist_ref;
-            fmt = 's%02d_ref.mat';
-            mode = 'ref';
+            fprintf('Beginning subject %d, %s.\n',iSubj,datacode);
         end
-        for iSubject=1:NSUBJ
-            iSubj = SUBJECTS(iSubject);
-            sdir = sprintf('Pt%02d',iSubj);
-            sfile = filelist{iSubj,1};
-            if isempty(sfile)||isempty(filelist{iSubj,4});
-                fprintf('Skipping subject %d, %s because of missing data.\n',iSubj,mode);
-                continue;
-            else
-                fprintf('Beginning subject %d, %s.\n',iSubj,mode);
+        dpath_out = fullfile(DATA_DIR_OUT, sprintf('s%02d_%s.mat',iSubj,datacode));
+        spath = fullfile(DATA_DIR,datacode,sdir,F.filename);
+        fprintf('Loading %s...\n', spath);
+        Pt = load(spath);
+
+        nChunks = numel(F.variables);
+        if nChunks > 1
+            nTicks = 0;
+            for iChunk = 1:nChunks
+                cvar = F.variables{iChunk};
+                nTicks = nTicks + size(Pt.(cvar).DATA,1);
             end
-            dpath_out = fullfile(DATA_DIR_OUT, sprintf(fmt,iSubj));
-            if exist(dpath_out,'file') && ~OVERWRITE;
-                fprintf('Skipping subject %d, %s because output already exists.\n',iSubj,mode)
-                continue
-            end
-            spath = fullfile(DATA_DIR,'raw',sdir,sfile);
-            fprintf('Loading %s...\n', spath);
-            Pt = load(spath);
+            interval = Pt.(cvar).DIM(1).interval;
+            electrodeLabels = Pt.(cvar).DIM(2).label;
+            Pt.LFP(1) = init_source_struct(nTicks,electrodeLabels,interval);
+            for iChunk = 1:nChunks
+                cvar = F.variables{iChunk};
+                sessions = F.sessions{iChunk};
+                tagfmt = F.sessiontag;
+                if iChunk == 1
+                    a = 1;
+                    b = size(Pt.(cvar).DATA,1);
+                    Pt.LFP.DATA(a:b,:) = Pt.(cvar).DATA;
+                    Pt.LFP.DIM(1).scale(a:b) = Pt.(cvar).DIM(1).scale;
+                    psize = b;
+                    pscale = max(Pt.(cvar).DIM(1).scale);
+                    Pt = rmfield(Pt,cvar);
+                else
+                    a = psize + 1;
+                    b = psize + size(Pt.(cvar).DATA,1);
+                    Pt.LFP.DATA(a:b,:) = Pt.(cvar).DATA;
+                    Pt.LFP.DIM(1).scale(a:b) = Pt.(cvar).DIM(1).scale + pscale;
 
-            nChunks = numel(filelist{iSubj,2});
-            if nChunks > 1
-                nTicks = 0;
-                for iChunk = 1:nChunks
-                    cvar = filelist{iSubj,2}{iChunk};
-                    nTicks = nTicks + size(Pt.(cvar).DATA,1);
-                end
-                interval = Pt.(cvar).DIM(1).interval;
-                electrodeLabels = Pt.(cvar).DIM(2).label;
-                Pt.LFP(1) = init_source_struct(nTicks,electrodeLabels,interval);
-                for iChunk = 1:nChunks
-                    cvar = filelist{iSubj,2}{iChunk};
-                    sessions = filelist{iSubj,3}{iChunk};
-                    tagfmt = filelist{iSubj,4};
-                    if iChunk == 1
-                        a = 1;
-                        b = size(Pt.(cvar).DATA,1);
-                        Pt.LFP.DATA(a:b,:) = Pt.(cvar).DATA;
-                        Pt.LFP.DIM(1).scale(a:b) = Pt.(cvar).DIM(1).scale;
-                        psize = b;
-                        pscale = max(Pt.(cvar).DIM(1).scale);
-                        Pt = rmfield(Pt,cvar);
-                    else
-                        a = psize + 1;
-                        b = psize + size(Pt.(cvar).DATA,1);
-                        Pt.LFP.DATA(a:b,:) = Pt.(cvar).DATA;
-                        Pt.LFP.DIM(1).scale(a:b) = Pt.(cvar).DIM(1).scale + pscale;
-
-                        for iSession = sessions
-                            tag = sprintf(tagfmt,iSession);
-                            Pt.(tag) = Pt.(tag) + psize;
-                        end
-
-                        psize = b;
-                        pscale = max(Pt.(cvar).DIM(1).scale);
-                        Pt = rmfield(Pt,cvar);
+                    for iSession = sessions
+                        tag = sprintf(tagfmt,iSession);
+                        Pt.(tag) = Pt.(tag) + psize;
                     end
-                end
-            else
-                cvar = filelist{iSubj,2}{1};
-                Pt.LFP = Pt.(cvar);
-                Pt = rmfield(Pt,cvar);
-            end
 
-            ecoord = ELECTRODE{iSubj};
-            edata = cellstr(Pt.LFP.DIM(2).label);
-
-            [zc,zd] = ismember(ecoord, edata);
-            zd = zd(zc);
-
-            COORDS = struct('orientation','mni','labels',{ELECTRODE{iSubj}(zc)},'ijk',[],'ind',[],'xyz',XYZ{iSubj}(zc,:));
-
-            Pt.LFP.DATA = Pt.LFP.DATA(:,zd);
-
-            onsetIndex = cell(1,4);
-            tagfmt = filelist{iSubj,4};
-            for iSession = 1:nsessions
-                tagname = sprintf(tagfmt,iSession);
-                onsetIndex{iSession} = Pt.(tagname);
-            end
-
-            Hz = 1 / Pt.LFP.DIM(1).interval; % ticks per second
-            boxcar_size = (BoxCarSize / 1000) * Hz;
-            window_start = (WindowStartInMilliseconds / 1000) * Hz;
-            window_size = (WindowSizeInMilliseconds / 1000) * Hz; % in ticks (where a tick is a single time-step).
-
-            % Will return a session -by- electrode cell array, each containing a
-            % trial -by- time matrix.
-            M = arrangeElectrodeData(Pt.LFP.DATA, onsetIndex, [window_start, window_size]);
-
-            % Sort and average time-points
-            nElectrodes = size(M,2);
-            for iElectrode = 1:nElectrodes
-                for iSession = 1:4
-                    M{iSession,iElectrode} = M{iSession,iElectrode}(stim_sort_ix{iSession},:);
-                    if boxcar_size > 1
-                        M{iSession,iElectrode} = boxcarmean(M{iSession,iElectrode},boxcar_size,'KeepPartial',0);
-                    end
-                end
-                % Average Sessions
-                if AverageOverSessions
-                    tmp = cat(3,M{:,iElectrode});
-                    M{1,iElectrode} = mean(tmp,3);
+                    psize = b;
+                    pscale = max(Pt.(cvar).DIM(1).scale);
+                    Pt = rmfield(Pt,cvar);
                 end
             end
+        else
+            cvar = F.variables{1};
+            Pt.LFP = Pt.(cvar);
+            Pt = rmfield(Pt,cvar);
+        end
+
+        ecoord = ELECTRODE{iSubj};
+        edata = cellstr(Pt.LFP.DIM(2).label);
+
+        [zc,zd] = ismember(ecoord, edata);
+        zd = zd(zc);
+
+        COORDS = struct('orientation','mni','labels',{ELECTRODE{iSubj}(zc)},'ijk',[],'ind',[],'xyz',XYZ{iSubj}(zc,:));
+
+        Pt.LFP.DATA = Pt.LFP.DATA(:,zd);
+
+        onsetIndex = cell(1,4);
+        tagfmt = F.sessiontag;
+        for iSession = 1:nsessions
+            tagname = sprintf(tagfmt,iSession);
+            onsetIndex{iSession} = Pt.(tagname);
+        end
+
+        Hz = 1 / Pt.LFP.DIM(1).interval; % ticks per second
+        boxcar_size = (BoxCarSize / 1000) * Hz;
+        window_start = (WindowStartInMilliseconds / 1000) * Hz;
+        window_size = (WindowSizeInMilliseconds / 1000) * Hz; % in ticks (where a tick is a single time-step).
+
+        % Will return a session -by- electrode cell array, each containing a
+        % trial -by- time matrix.
+        M = arrangeElectrodeData(Pt.LFP.DATA, onsetIndex, [window_start, window_size]);
+
+        % Sort and average time-points
+        nElectrodes = size(M,2);
+        for iElectrode = 1:nElectrodes
+            for iSession = 1:4
+                M{iSession,iElectrode} = M{iSession,iElectrode}(stim_sort_ix{iSession},:);
+                if boxcar_size > 1
+                    M{iSession,iElectrode} = boxcarmean(M{iSession,iElectrode},boxcar_size,'KeepPartial',0);
+                end
+            end
+            % Average Sessions
             if AverageOverSessions
-                M(2:end,:) = [];
+                tmp = cat(3,M{:,iElectrode});
+                M{1,iElectrode} = mean(tmp,3);
             end
-            X = cell2mat(M);
-            [~,reduxFilter] = removeOutliers(X);
-            y = COORDS.xyz(:,2);
-            m = median(y);
-            metadata(iSubject) = registerFilter(metadata(iSubject), 'rowfilter', 1, reduxFilter.words);
-            metadata(iSubject) = registerFilter(metadata(iSubject), 'colfilter', 2, reduxFilter.voxels);
-            metadata(iSubject) = registerFilter(metadata(iSubject), 'anterior',  2, y > m);
-            metadata(iSubject) = registerFilter(metadata(iSubject), 'posterior', 2, y <= m);
-            metadata(iSubject).coords = COORDS;
-            metadata(iSubject).ncol = size(X,2);
-            metadata(iSubject).samplingrate = Hz;
-
+        end
+        if AverageOverSessions
+            M(2:end,:) = [];
+        end
+        X = cell2mat(M);
+        [~,reduxFilter] = removeOutliers(X);
+        y = COORDS.xyz(:,2);
+        m = median(y);
+        metadata(iSubject) = registerFilter(metadata(iSubject), 'rowfilter', 1, reduxFilter.words);
+        metadata(iSubject) = registerFilter(metadata(iSubject), 'colfilter', 2, reduxFilter.voxels);
+        metadata(iSubject) = registerFilter(metadata(iSubject), 'anterior',  2, y > m);
+        metadata(iSubject) = registerFilter(metadata(iSubject), 'posterior', 2, y <= m);
+        metadata(iSubject).coords = COORDS;
+        metadata(iSubject).ncol = size(X,2);
+        metadata(iSubject).samplingrate = Hz;
+        if exist(dpath_out,'file') && ~OVERWRITE;
+            fprintf('Subject %d not written to disk, %s because output already exists.\n',iSubj,datacode)
+        else
             save(dpath_out, 'X');
         end
-      %% Save metadata
-      save(fullfile(DATA_DIR_OUT,sprintf('metadata_%s.mat',mode)),'metadata');
     end
+    %% Save metadata
+    save(fullfile(DATA_DIR_OUT,sprintf('metadata_%s.mat',datacode)),'metadata');
 end
