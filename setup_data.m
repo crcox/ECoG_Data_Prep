@@ -529,12 +529,15 @@ function setup_data(varargin)
         if exist(dpath_out,'file') && ~OVERWRITE;
             fprintf('Subject %d not written to disk, %s because output already exists.\n',iSubj,datacode)
         else
+            metapathout = fullfile(DATA_DIR_OUT,sprintf('metadata_%s_%02d.mat',datacode,SUBJECTS(iSubject)));
             save(dpath_out, 'X');
             fprintf('Subject written to %s\n', dpath_out);
+            save(metapathout,'metadata');
+            fprintf('Metadata written to %s\n', metapathout);
         end
     end
     %% Save metadata
-    metapathout = fullfile(DATA_DIR_OUT,sprintf('metadata_%s.mat',datacode));
+    metapathout = fullfile(DATA_DIR_OUT,sprintf('metadata_%s_%s.mat',datacode,num2str(SUBJECTS,'%02d')));
     fprintf('Metadata written to %s\n', metapathout);
     save(metapathout,'metadata');
 end
