@@ -3,3 +3,5 @@ coords/**
 stimuli/**
 *.asv
 *.swp
+run_ECOG_setup_data.sh
+ECOG_setup_data

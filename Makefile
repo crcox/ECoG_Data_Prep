@@ -7,10 +7,7 @@ SRC=.
 INCL= -N -p stats -I $(SRC)
 .PHONEY: all clean-all clean-postbuild glmnet sdist
 
-all: setup ECOG_setup_data clean-postbuild
-
-setup:
-	tar xzvf $(SRCTAR)
+all: ECOG_setup_data clean-postbuild
 
 ECOG_setup_data: $(SRC)/setup_data.m
 	$(MCC) -v $(MFLAGS) $(INCL) -o $@ $<
