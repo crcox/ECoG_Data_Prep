@@ -5,3 +5,6 @@ stimuli/**
 *.swp
 run_ECOG_setup_data.sh
 ECOG_setup_data
+source_code.zip
+source_code.tar.gz
+source_code.tgz
