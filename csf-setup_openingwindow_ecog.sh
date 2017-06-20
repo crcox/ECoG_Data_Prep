@@ -23,7 +23,9 @@ NDIGITS=${#NJOBS}
 EXE=$EXP_BASE/run_ECOG_setup_data.sh
 
 # Path too the root of the data directory tree
-DATAROOT="${HOME}/scratch/data/ECOG/Naming/avg"
+DATAROOT="${HOME}/scratch/data/ECOG/KyotoNaming"
+DATAROOTOUT="${HOME}/scratch/debug"
+METAROOT="${HOME}/scratch/data/ECOG/KyotoNaming/meta"
 
 # Here comes some fancy bash: apparently when you combine two or more brace
 # expansions, you get the cartesian product of the two. That is:
@@ -93,4 +95,8 @@ $EXE "$MATLABDIR" \
     "subjects" "$S" \
     "average" 1 \
     "boxcar" 10 \
-    "cvpath" "cvpartition_10fold_wholewindow.mat"
+    "dataroot" "$DATAROOT" \
+    "metaroot" "$METAROOT" \
+    "datarootout" "$DATAROOTOUT" \
+    "cvpath" "cvpartition_10fold_wholewindow.mat" \
+    "overwrite" 1

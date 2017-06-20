@@ -48,8 +48,9 @@ function setup_data(varargin)
         addParameter(p, 'boxcar', '0', @ischar);
         addParameter(p, 'average', '1', @ischar);
         addParameter(p, 'datacode', 'raw', @ischar);
-        addParameter(p, 'dataroot', '/mnt/sw01-home01/mbmhscc4/scratch/data/Naming_ECoG/avg');
+        addParameter(p, 'dataroot', '/mnt/sw01-home01/mbmhscc4/scratch/data/Naming_ECoG');
         addParameter(p, 'metaroot', '/mnt/sw01-home01/mbmhscc4/scratch/data/Naming_ECoG/meta');
+        addParameter(p, 'datarootout', []);
         addParameter(p, 'cvpath', []);
         addParameter(p, 'overwrite', '0');
         parse(p, varargin{:});
@@ -64,7 +65,7 @@ function setup_data(varargin)
         fprintf('               subjects: %s\n', p.Results.subjects);
         fprintf('            Boxcar Size: %s\n', p.Results.boxcar);
         fprintf('  Average over sessions: %s\n', p.Results.average);
-        fprintf(' Data root (for output): %s\n', p.Results.dataroot);
+        fprintf('  Data root (for input): %s\n', p.Results.dataroot);
         fprintf('  Meta root (for input): %s\n', p.Results.metaroot);
         fprintf('Overwrite existing data: %s\n', p.Results.overwrite);
 
@@ -88,6 +89,7 @@ function setup_data(varargin)
         addParameter(p, 'datacode', 'raw', @ischar);
         addParameter(p, 'dataroot', 'D:\ECoG\KyotoNaming\data');
         addParameter(p, 'metaroot', 'C:\Users\mbmhscc4\MATLAB\ECOG\naming\data');
+        addParameter(p, 'datarootout', []);
         addParameter(p, 'cvpath', []);
         addParameter(p, 'overwrite', 0);
         if isjsoncfg
@@ -102,7 +104,7 @@ function setup_data(varargin)
         fprintf('               subjects: %s\n', strjoin(strsplit(num2str(p.Results.subjects)), ', '));
         fprintf('            Boxcar Size: %d\n', p.Results.boxcar);
         fprintf('  Average over sessions: %d\n', p.Results.average);
-        fprintf(' Data root (for output): %s\n', p.Results.dataroot);
+        fprintf('  Data root (for input): %s\n', p.Results.dataroot);
         fprintf('  Meta root (for input): %s\n', p.Results.metaroot);
         fprintf('Overwrite existing data: %d\n', p.Results.overwrite);
 
@@ -115,6 +117,11 @@ function setup_data(varargin)
         SUBJECTS = p.Results.subjects;
     end
     DATA_DIR = p.Results.dataroot;
+    if isempty(p.Results.datarootout)
+        DATA_ROOT_OUT = DATA_DIR;
+    else
+        DATA_ROOT_OUT = p.Results.datarootout;
+    end
     META_DIR = p.Results.metaroot;
     STIM_DIR = fullfile(META_DIR,'stimuli');
     COORD_DIR = fullfile(META_DIR,'coords');
@@ -132,7 +139,7 @@ function setup_data(varargin)
         base_dir = 'full';
     end
     DATA_DIR_OUT = fullfile(...
-        DATA_DIR,...
+        DATA_ROOT_OUT,...
         base_dir,...
         'BoxCar',sprintf('%03d',BoxCarSize),...
         'WindowStart',sprintf('%04d',WindowStartInMilliseconds),...
@@ -523,8 +530,11 @@ function setup_data(varargin)
             fprintf('Subject %d not written to disk, %s because output already exists.\n',iSubj,datacode)
         else
             save(dpath_out, 'X');
+            fprintf('Subject written to %s\n', dpath_out);
         end
     end
     %% Save metadata
-    save(fullfile(DATA_DIR_OUT,sprintf('metadata_%s.mat',datacode)),'metadata');
+    metapathout = fullfile(DATA_DIR_OUT,sprintf('metadata_%s.mat',datacode));
+    fprintf('Metadata written to %s\n', metapathout);
+    save(metapathout,'metadata');
 end
