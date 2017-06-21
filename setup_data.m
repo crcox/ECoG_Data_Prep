@@ -331,7 +331,6 @@ function setup_data(varargin)
         if numel(fieldnames(metadata(iSubject).filters)) == 0
             M.filters = FILTERS;
         end
-%         metadata(iSubj).targets = TARGETS; % handled above
         M.cvind = SCHEMES;
         M.ncol = 0; % will be set later
         metadata = replacebyfield(metadata, M, 'subject', SUBJECTS(iSubject));
@@ -392,8 +391,8 @@ function setup_data(varargin)
             filelist(9).sessions = {1:4};
             filelist(9).sessiontag = 'tag%02d';
             % Subject 10
-            filelist(10).filename = 'namingERP_Pt01.mat';
-            filelist(10).variables = {'namingERP_data_PtYK_Pt01'};
+            filelist(10).filename = 'namingERP_Pt10.mat';
+            filelist(10).variables = {'namingERPdataPt10'};
             filelist(10).sessions = {1:4};
             filelist(10).sessiontag = 'tagall%02d';
         case 'ref'
@@ -412,17 +411,15 @@ function setup_data(varargin)
     end
 
     for iSubject=1:NSUBJ
-        s = SUBJECTS(iSubject);
-        iSubj = SUBJECTS(iSubject);
-        sdir = sprintf('Pt%02d',iSubj);
-        F = selectbyfield(filelist, 'subject', s);
+        sdir = sprintf('Pt%02d',SUBJECTS(iSubject));
+        F = selectbyfield(filelist, 'subject', SUBJECTS(iSubject););
         if any(cellfun('isempty', struct2cell(F)))
-            fprintf('Skipping subject %d, %s because of missing data.\n',iSubj,datacode);
+            fprintf('Skipping subject %d, %s because of missing data.\n',SUBJECTS(iSubject),datacode);
             continue
         else
-            fprintf('Beginning subject %d, %s.\n',iSubj,datacode);
+            fprintf('Beginning subject %d, %s.\n',SUBJECTS(iSubject),datacode);
         end
-        dpath_out = fullfile(DATA_DIR_OUT, sprintf('s%02d_%s.mat',iSubj,datacode));
+        dpath_out = fullfile(DATA_DIR_OUT, sprintf('s%02d_%s.mat',SUBJECTS(iSubject),datacode));
         spath = fullfile(DATA_DIR,datacode,sdir,F.filename);
         fprintf('Loading %s...\n', spath);
         Pt = load(spath);
@@ -471,13 +468,13 @@ function setup_data(varargin)
             Pt = rmfield(Pt,cvar);
         end
 
-        ecoord = ELECTRODE{iSubj};
+        ecoord = ELECTRODE{SUBJECTS(iSubject)};
         edata = cellstr(Pt.LFP.DIM(2).label);
 
         [zc,zd] = ismember(ecoord, edata);
         zd = zd(zc);
 
-        COORDS = struct('orientation','mni','labels',{ELECTRODE{iSubj}(zc)},'ijk',[],'ind',[],'xyz',XYZ{iSubj}(zc,:));
+        COORDS = struct('orientation','mni','labels',{ELECTRODE{SUBJECTS(iSubject)}(zc)},'ijk',[],'ind',[],'xyz',XYZ{SUBJECTS(iSubject)}(zc,:));
 
         Pt.LFP.DATA = Pt.LFP.DATA(:,zd);
 
@@ -527,7 +524,7 @@ function setup_data(varargin)
         metadata(iSubject).ncol = size(X,2);
         metadata(iSubject).samplingrate = Hz;
         if exist(dpath_out,'file') && ~OVERWRITE;
-            fprintf('Subject %d not written to disk, %s because output already exists.\n',iSubj,datacode)
+            fprintf('Subject %d not written to disk, %s because output already exists.\n',SUBJECTS(iSubject),datacode)
         else
             metapathout = fullfile(DATA_DIR_OUT,sprintf('metadata_%s_%02d.mat',datacode,SUBJECTS(iSubject)));
             save(dpath_out, 'X');

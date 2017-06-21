@@ -4,7 +4,7 @@ export MFLAGS=-m -R -singleCompThread -R -nodisplay -R -nojvm
 TOP := $(shell pwd)
 SRCTAR=source_code.tar.gz
 SRC=.
-INCL= -N -p stats -I $(SRC)
+INCL= -N -p stats -I $(SRC) -a ./data
 .PHONEY: all clean-all clean-postbuild glmnet sdist
 
 all: ECOG_setup_data clean-postbuild
