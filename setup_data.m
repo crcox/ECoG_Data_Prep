@@ -392,8 +392,8 @@ function setup_data(varargin)
             filelist(9).sessions = {1:4};
             filelist(9).sessiontag = 'tag%02d';
             % Subject 10
-            filelist(10).filename = 'namingERP_Pt01.mat';
-            filelist(10).variables = {'namingERP_data_PtYK_Pt01'};
+            filelist(10).filename = 'namingERP_Pt10.mat';
+            filelist(10).variables = {'namingERPdataPt10'};
             filelist(10).sessions = {1:4};
             filelist(10).sessiontag = 'tagall%02d';
         case 'ref'
@@ -417,12 +417,12 @@ function setup_data(varargin)
         sdir = sprintf('Pt%02d',iSubj);
         F = selectbyfield(filelist, 'subject', s);
         if any(cellfun('isempty', struct2cell(F)))
-            fprintf('Skipping subject %d, %s because of missing data.\n',iSubj,datacode);
+            fprintf('Skipping subject %d, %s because of missing data.\n',s,datacode);
             continue
         else
-            fprintf('Beginning subject %d, %s.\n',iSubj,datacode);
+            fprintf('Beginning subject %d, %s.\n',SUBJECTS(iSubject),datacode);
         end
-        dpath_out = fullfile(DATA_DIR_OUT, sprintf('s%02d_%s.mat',iSubj,datacode));
+        dpath_out = fullfile(DATA_DIR_OUT, sprintf('s%02d_%s.mat',s,datacode));
         spath = fullfile(DATA_DIR,datacode,sdir,F.filename);
         fprintf('Loading %s...\n', spath);
         Pt = load(spath);
@@ -471,13 +471,13 @@ function setup_data(varargin)
             Pt = rmfield(Pt,cvar);
         end
 
-        ecoord = ELECTRODE{iSubj};
+        ecoord = ELECTRODE{SUBJECTS(iSubject)};
         edata = cellstr(Pt.LFP.DIM(2).label);
 
         [zc,zd] = ismember(ecoord, edata);
         zd = zd(zc);
 
-        COORDS = struct('orientation','mni','labels',{ELECTRODE{iSubj}(zc)},'ijk',[],'ind',[],'xyz',XYZ{iSubj}(zc,:));
+        COORDS = struct('orientation','mni','labels',{ELECTRODE{SUBJECTS(iSubject)}(zc)},'ijk',[],'ind',[],'xyz',XYZ{SUBJECTS(iSubject)}(zc,:));
 
         Pt.LFP.DATA = Pt.LFP.DATA(:,zd);
 
@@ -527,14 +527,17 @@ function setup_data(varargin)
         metadata(iSubject).ncol = size(X,2);
         metadata(iSubject).samplingrate = Hz;
         if exist(dpath_out,'file') && ~OVERWRITE;
-            fprintf('Subject %d not written to disk, %s because output already exists.\n',iSubj,datacode)
+            fprintf('Subject %d not written to disk, %s because output already exists.\n',SUBJECTS(iSubject),datacode)
         else
+            metapathout = fullfile(DATA_DIR_OUT,sprintf('metadata_%s_%02d.mat',datacode,SUBJECTS(iSubject)));
             save(dpath_out, 'X');
             fprintf('Subject written to %s\n', dpath_out);
+            save(metapathout,'metadata');
+            fprintf('Metadata written to %s\n', metapathout);
         end
     end
     %% Save metadata
-    metapathout = fullfile(DATA_DIR_OUT,sprintf('metadata_%s.mat',datacode));
+    metapathout = fullfile(DATA_DIR_OUT,sprintf('metadata_%s_%s.mat',datacode,num2str(SUBJECTS,'%02d')));
     fprintf('Metadata written to %s\n', metapathout);
     save(metapathout,'metadata');
 end
