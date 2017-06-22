@@ -331,7 +331,6 @@ function setup_data(varargin)
         if numel(fieldnames(metadata(iSubject).filters)) == 0
             M.filters = FILTERS;
         end
-%         metadata(iSubj).targets = TARGETS; % handled above
         M.cvind = SCHEMES;
         M.ncol = 0; % will be set later
         metadata = replacebyfield(metadata, M, 'subject', SUBJECTS(iSubject));
@@ -412,17 +411,15 @@ function setup_data(varargin)
     end
 
     for iSubject=1:NSUBJ
-        s = SUBJECTS(iSubject);
-        iSubj = SUBJECTS(iSubject);
-        sdir = sprintf('Pt%02d',iSubj);
+        sdir = sprintf('Pt%02d',SUBJECTS(iSubject));
         F = selectbyfield(filelist, 'subject', s);
         if any(cellfun('isempty', struct2cell(F)))
-            fprintf('Skipping subject %d, %s because of missing data.\n',s,datacode);
+            fprintf('Skipping subject %d, %s because of missing data.\n',SUBJECTS(iSubject),datacode);
             continue
         else
             fprintf('Beginning subject %d, %s.\n',SUBJECTS(iSubject),datacode);
         end
-        dpath_out = fullfile(DATA_DIR_OUT, sprintf('s%02d_%s.mat',s,datacode));
+        dpath_out = fullfile(DATA_DIR_OUT, sprintf('s%02d_%s.mat',SUBJECTS(iSubject),datacode));
         spath = fullfile(DATA_DIR,datacode,sdir,F.filename);
         fprintf('Loading %s...\n', spath);
         Pt = load(spath);
