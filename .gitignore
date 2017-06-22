@@ -1,5 +1,10 @@
-targets/**
-coords/**
-stimuli/**
 *.asv
 *.swp
+run_ECOG_setup_data.sh
+ECOG_setup_data
+source_code.zip
+source_code.tar.gz
+source_code.tgz
+meta/electrodes/MMNI152_T1_2mm_brain_nocereb.nii.gz
+meta/coordinates/MNI_N27_SurfVol.nii
+meta/electrodes/MNI_N27_SurfVol.nii

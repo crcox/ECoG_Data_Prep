@@ -412,7 +412,7 @@ function setup_data(varargin)
 
     for iSubject=1:NSUBJ
         sdir = sprintf('Pt%02d',SUBJECTS(iSubject));
-        F = selectbyfield(filelist, 'subject', s);
+        F = selectbyfield(filelist, 'subject', SUBJECTS(iSubject));
         if any(cellfun('isempty', struct2cell(F)))
             fprintf('Skipping subject %d, %s because of missing data.\n',SUBJECTS(iSubject),datacode);
             continue
