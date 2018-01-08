@@ -23,9 +23,7 @@ NDIGITS=${#NJOBS}
 EXE=$EXP_BASE/run_ECOG_setup_data.sh
 
 # Path too the root of the data directory tree
-DATAROOT="${HOME}/scratch/data/ECOG/KyotoNaming"
-DATAROOTOUT="${HOME}/scratch/debug"
-METAROOT="${HOME}/scratch/data/ECOG/KyotoNaming/meta"
+DATAROOT="${HOME}/scratch/data/ECOG/Naming/avg"
 
 # Here comes some fancy bash: apparently when you combine two or more brace
 # expansions, you get the cartesian product of the two. That is:
@@ -66,12 +64,10 @@ METAROOT="${HOME}/scratch/data/ECOG/KyotoNaming/meta"
 #      A
 #    echo ${y[1]}
 #      2
-SUBJECTS=1 2 3 5 7 8 9 10
 ONSET=200
-DURATION={50..1000..10}
-
-#           subjects             duration
-CONDITIONS=({1,2,3,5,7,8,9,10}" "{50..1000..10})
+SUBJECTS="1 2 3 5 7 8 9 10"
+DURATION=({50..1000..10})
+CONDITIONS=(" ")
 echo "Number of jobs: $NJOBS"
 
 # Remember that $SGE_TASK_ID will be 1, 2, 3, ... 24.
@@ -80,9 +76,7 @@ TID=$[SGE_TASK_ID-1]
 
 # Index in to the arrays of directory names to create a path
 COND=(${CONDITIONS[$TID]})
-S=${COND[0]}
-D=${COND[1]}
-O=${ONSET}
+D=${DURATION[$TID]}
 
 # Echo some info to the job output file
 echo "Running SGE_TASK_ID $SGE_TASK_ID"
@@ -90,13 +84,13 @@ echo "Subject ${S}, Onset ${O}, and Duration ${D}"
 
 # Finally run my executable from the correct directory
 $EXE "$MATLABDIR" \
-    "onset" "$O" \
+    "onset" "$ONSET" \
     "duration" "$D" \
-    "subjects" "$S" \
+    "subjects" "$SUBJECTS" \
     "average" 1 \
     "boxcar" 10 \
-    "dataroot" "$DATAROOT" \
-    "metaroot" "$METAROOT" \
-    "datarootout" "$DATAROOTOUT" \
+    "datacode" "raw" \
     "cvpath" "cvpartition_10fold_wholewindow.mat" \
+    "dataroot" "/mnt/sw01-home01/mbmhscc4/scratch/data/ECOG/KyotoNaming" \
+    "metaroot" "/mnt/sw01-home01/mbmhscc4/scratch/data/ECOG/KyotoNaming/meta" \
     "overwrite" 1

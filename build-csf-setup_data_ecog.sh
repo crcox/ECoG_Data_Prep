@@ -4,6 +4,8 @@
 
 #$ -S /bin/bash # The jobscript is written for the bash shell
 #$ -V # Inherit environment settings (e.g., from loaded modulefiles)
+#$ -e build-csf-setup_data_ecog-logfiles
+#$ -o build-csf-setup_data_ecog-logfiles
 #$ -cwd # Run the job in the current directory
 #$ -l short
 

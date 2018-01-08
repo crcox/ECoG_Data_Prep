@@ -8,3 +8,4 @@ source_code.tgz
 meta/electrodes/MMNI152_T1_2mm_brain_nocereb.nii.gz
 meta/coordinates/MNI_N27_SurfVol.nii
 meta/electrodes/MNI_N27_SurfVol.nii
+build-csf-setup_data_ecog-logfiles/*
