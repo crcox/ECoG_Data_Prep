@@ -259,7 +259,7 @@ function setup_data(varargin)
                             tmp = textscan(fid, '%s');
                             structure_labels = tmp{1};
                             fclose(fid);
-                            metadata = installSimilarityStructure(metadata, structure_matrix, structure_labels, type_sim, source, metric_label);
+                            metadata = installSimilarityStructure(metadata, structure_matrix, structure_labels, type_sim, source, metric_label, type_fmt);
                         end
                     end
                 end

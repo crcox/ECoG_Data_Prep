@@ -1,4 +1,4 @@
-function metadata = installSimilarityStructure(metadata, simmat, simlabels, label, source, metric)
+function metadata = installSimilarityStructure(metadata, simmat, simlabels, label, source, metric, type)
   % Check that simmat is a similarity matrix or (probably) an embedding.
   [m,n] = size(simmat);
   if m == n
@@ -10,8 +10,10 @@ function metadata = installSimilarityStructure(metadata, simmat, simlabels, labe
       error('simmat is not symmetric! A symmetric similarity matrix is required.')
     end
   else
-    warning('simmat is not a symmetric similarity matrix. It will be treated as an embedding.');
-    type = 'embedding';
+    if strcmpi(type,'similarity')
+      warning('simmat is not a symmetric similarity matrix. It will be treated as an embedding.');
+      type = 'embedding';
+    end
   end
 
   % Confirm that stimulus order is the same for all subjects
