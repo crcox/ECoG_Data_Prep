@@ -53,6 +53,7 @@ function setup_data(varargin)
         addParameter(p, 'datarootout', []);
         addParameter(p, 'cvpath', []);
         addParameter(p, 'overwrite', '0');
+        addParameter(p, 'WriteIndividualMetadata', '0');
         parse(p, varargin{:});
         if isempty(p.Results.onset)
             error('A window onset time must be provided.');
@@ -60,14 +61,15 @@ function setup_data(varargin)
         if isempty(p.Results.duration)
             error('A window duration must be provided.');
         end
-        fprintf('      Window onset (ms): %s\n', p.Results.onset);
-        fprintf('   Window duration (ms): %s\n', p.Results.duration);
-        fprintf('               subjects: %s\n', p.Results.subjects);
-        fprintf('            Boxcar Size: %s\n', p.Results.boxcar);
-        fprintf('  Average over sessions: %s\n', p.Results.average);
-        fprintf('  Data root (for input): %s\n', p.Results.dataroot);
-        fprintf('  Meta root (for input): %s\n', p.Results.metaroot);
-        fprintf('Overwrite existing data: %s\n', p.Results.overwrite);
+        fprintf('        Window onset (ms): %s\n', p.Results.onset);
+        fprintf('     Window duration (ms): %s\n', p.Results.duration);
+        fprintf('                 subjects: %s\n', p.Results.subjects);
+        fprintf('              Boxcar Size: %s\n', p.Results.boxcar);
+        fprintf('    Average over sessions: %s\n', p.Results.average);
+        fprintf('    Data root (for input): %s\n', p.Results.dataroot);
+        fprintf('    Meta root (for input): %s\n', p.Results.metaroot);
+        fprintf('  Overwrite existing data: %s\n', p.Results.overwrite);
+        fprintf('Write individual metadata: %s\n', p.Results.WriteIndividualMetadata);
 
         %% Setup
         WindowStartInMilliseconds = str2double(p.Results.onset);
@@ -75,6 +77,7 @@ function setup_data(varargin)
         BoxCarSize = str2double(p.Results.boxcar);
         AverageOverSessions = str2double(p.Results.average);
         OVERWRITE = str2double(p.Results.overwrite);
+        WriteIndividualMetadata = str2double(p.Results.WriteIndividualMetadata);
         clean_string = regexprep(p.Results.subjects, ',? *', ' ');
         SUBJECTS = str2double(strsplit(clean_string));
     else
@@ -92,6 +95,8 @@ function setup_data(varargin)
         addParameter(p, 'datarootout', []);
         addParameter(p, 'cvpath', []);
         addParameter(p, 'overwrite', 0);
+        addParameter(p, 'WriteIndividualMetadata', 0);
+
         if isjsoncfg
             % Input read from a json file will be represented as a
             % structure. The inputParser cannot handle this structure, and
@@ -99,14 +104,15 @@ function setup_data(varargin)
             varargin = [fieldnames(jdat); struct2cell(jdat)];
         end
         parse(p, varargin{:});
-        fprintf('      Window onset (ms): %d\n', p.Results.onset);
-        fprintf('   Window duration (ms): %d\n', p.Results.duration);
-        fprintf('               subjects: %s\n', strjoin(strsplit(num2str(p.Results.subjects)), ', '));
-        fprintf('            Boxcar Size: %d\n', p.Results.boxcar);
-        fprintf('  Average over sessions: %d\n', p.Results.average);
-        fprintf('  Data root (for input): %s\n', p.Results.dataroot);
-        fprintf('  Meta root (for input): %s\n', p.Results.metaroot);
-        fprintf('Overwrite existing data: %d\n', p.Results.overwrite);
+        fprintf('        Window onset (ms): %d\n', p.Results.onset);
+        fprintf('     Window duration (ms): %d\n', p.Results.duration);
+        fprintf('                 subjects: %s\n', strjoin(strsplit(num2str(p.Results.subjects)), ', '));
+        fprintf('              Boxcar Size: %d\n', p.Results.boxcar);
+        fprintf('    Average over sessions: %d\n', p.Results.average);
+        fprintf('    Data root (for input): %s\n', p.Results.dataroot);
+        fprintf('    Meta root (for input): %s\n', p.Results.metaroot);
+        fprintf('  Overwrite existing data: %d\n', p.Results.overwrite);
+        fprintf('Write individual metadata: %d\n', p.Results.WriteIndividualMetadata);
 
         %% Setup
         WindowStartInMilliseconds = p.Results.onset;
@@ -114,6 +120,7 @@ function setup_data(varargin)
         BoxCarSize = p.Results.boxcar;
         AverageOverSessions = p.Results.average;
         OVERWRITE = p.Results.overwrite;
+        WriteIndividualMetadata = p.Results.WriteIndividualMetadata;
         SUBJECTS = p.Results.subjects;
     end
     DATA_DIR = p.Results.dataroot;
@@ -328,7 +335,7 @@ function setup_data(varargin)
         M.BoxCarSize = BoxCarSize;
         M.WindowStartInMilliseconds = WindowStartInMilliseconds;
         M.WindowSizeInMilliseconds = WindowSizeInMilliseconds;
-        if numel(fieldnames(metadata(iSubject).filters)) == 0
+        if numel(fieldnames(M.filters)) == 0
             M.filters = FILTERS;
         end
         M.cvind = SCHEMES;
@@ -492,49 +499,58 @@ function setup_data(varargin)
 
         % Will return a session -by- electrode cell array, each containing a
         % trial -by- time matrix.
-        M = arrangeElectrodeData(Pt.LFP.DATA, onsetIndex, [window_start, window_size]);
+        ECA = arrangeElectrodeData(Pt.LFP.DATA, onsetIndex, [window_start, window_size]);
 
         % Sort and average time-points
-        nElectrodes = size(M,2);
+        nElectrodes = size(ECA,2);
         for iElectrode = 1:nElectrodes
             for iSession = 1:4
-                M{iSession,iElectrode} = M{iSession,iElectrode}(stim_sort_ix{iSession},:);
+                ECA{iSession,iElectrode} = ECA{iSession,iElectrode}(stim_sort_ix{iSession},:);
                 if boxcar_size > 1
-                    M{iSession,iElectrode} = boxcarmean(M{iSession,iElectrode},boxcar_size,'KeepPartial',0);
+                    ECA{iSession,iElectrode} = boxcarmean(ECA{iSession,iElectrode},boxcar_size,'KeepPartial',0);
                 end
             end
             % Average Sessions
             if AverageOverSessions
-                tmp = cat(3,M{:,iElectrode});
-                M{1,iElectrode} = mean(tmp,3);
+                tmp = cat(3,ECA{:,iElectrode});
+                ECA{1,iElectrode} = mean(tmp,3);
             end
         end
         if AverageOverSessions
-            M(2:end,:) = [];
+            ECA(2:end,:) = [];
         end
-        X = cell2mat(M);
+        X = cell2mat(ECA);
         [~,reduxFilter] = removeOutliers(X);
         y = COORDS.xyz(:,2);
         m = median(y);
-        metadata(iSubject) = registerFilter(metadata(iSubject), 'rowfilter', 1, reduxFilter.words);
-        metadata(iSubject) = registerFilter(metadata(iSubject), 'colfilter', 2, reduxFilter.voxels);
-        metadata(iSubject) = registerFilter(metadata(iSubject), 'anterior',  2, y > m);
-        metadata(iSubject) = registerFilter(metadata(iSubject), 'posterior', 2, y <= m);
-        metadata(iSubject).coords = COORDS;
-        metadata(iSubject).ncol = size(X,2);
-        metadata(iSubject).samplingrate = Hz;
+        
+        M = selectbyfield(metadata, 'subject', SUBJECTS(iSubject));
+        M = registerFilter(M, 'rowfilter', 1, reduxFilter.words);
+        M = registerFilter(M, 'colfilter', 2, reduxFilter.voxels);
+        M = registerFilter(M, 'anterior',  2, y > m);
+        M = registerFilter(M, 'posterior', 2, y <= m);
+        M.coords = COORDS;
+        M.ncol = size(X,2);
+        M.samplingrate = Hz;
+        metadata = replacebyfield(metadata, M, 'subject', SUBJECTS(iSubject));
+
         if exist(dpath_out,'file') && ~OVERWRITE;
             fprintf('Subject %d not written to disk, %s because output already exists.\n',SUBJECTS(iSubject),datacode)
         else
-            metapathout = fullfile(DATA_DIR_OUT,sprintf('metadata_%s_%02d.mat',datacode,SUBJECTS(iSubject)));
             save(dpath_out, 'X');
             fprintf('Subject written to %s\n', dpath_out);
-            save(metapathout,'metadata');
-            fprintf('Metadata written to %s\n', metapathout);
+            if WriteIndividualMetadata
+                OneSubject.metadata = M;
+                metapathout = fullfile(DATA_DIR_OUT,sprintf('metadata_%s_%02d.mat',datacode,SUBJECTS(iSubject)));
+                save(metapathout, '-struct', OneSubject);
+                fprintf('Metadata written to %s\n', metapathout);
+            end
         end
     end
     %% Save metadata
-    metapathout = fullfile(DATA_DIR_OUT,sprintf('metadata_%s_%s.mat',datacode,num2str(SUBJECTS,'%02d')));
-    fprintf('Metadata written to %s\n', metapathout);
-    save(metapathout,'metadata');
+    if ~WriteIndividualMetadata
+        metapathout = fullfile(DATA_DIR_OUT,sprintf('metadata_%s.mat',datacode));
+        fprintf('Metadata written to %s\n', metapathout);
+        save(metapathout,'metadata');
+    end
 end
