@@ -481,7 +481,19 @@ function setup_data(varargin)
         [zc,zd] = ismember(ecoord, edata);
         zd = zd(zc);
 
-        COORDS = struct('orientation','mni','labels',{ELECTRODE{SUBJECTS(iSubject)}(zc)},'ijk',[],'ind',[],'xyz',XYZ{SUBJECTS(iSubject)}(zc,:));
+        ntp = (WindowSizeInMilliseconds / BoxCarSize);
+        xyz = XYZ{SUBJECTS(iSubject)}(zc,:);
+        xyzc = mat2cell(xyz, ones(size(xyz,1),1), size(xyz,2));
+        xyzcm = repmat(xyzc(:)', ntp, 1);
+        xyzcv = xyzcm(:);
+        xyz_repeated = cell2mat(xyzcv);
+        
+        trode = ELECTRODE{SUBJECTS(iSubject)}(zc);
+        trodecm = repmat(trode(:)', ntp, 1);
+        trodecv = trodecm(:);
+        trode_repeated = cell2mat(trodecv);
+        
+        COORDS = struct('orientation','mni','labels',{trode_repeated},'ijk',[],'ind',[],'xyz',xyz_repeated);
 
         Pt.LFP.DATA = Pt.LFP.DATA(:,zd);
 
