@@ -1,0 +1,50 @@
+\begin{forest}
+	for tree={
+		font=\ttfamily,
+		grow'=0,
+		child anchor=west,
+		parent anchor=south,
+		anchor=west,
+		calign=first,
+		inner xsep=7pt,
+		edge path={
+			\noexpand\path [draw, \forestoption{edge}]
+			(!u.south west) +(7.5pt,0) |- (.child anchor) pic {folder} \forestoption{edge label};
+		},
+		before typesetting nodes={
+			if n=1
+			{insert before={[,phantom]}}
+			{}
+		},
+		fit=band,
+		before computing xy={l=15pt},
+	}  
+	[{<\emph{metaroot}>}
+		[coords
+			[MNI\_basal\_electrodes\_Pt01\_10\_w\_label.csv, edge path={}]
+		]
+		[stimuli
+			[picture\_namingERP\_key.csv, edge path={}]
+			[picture\_namingERP\_order.csv, edge path={}]
+		]
+		[targets
+			[category
+				[{<\emph{target\_label\_1}>.csv}, edge path={}]
+				[{<\emph{target\_label\_2}>.csv}, edge path={}]
+				[{\dots}, edge path={}]
+				[{<\emph{target\_label\_N}>.csv}, edge path={}]
+			]
+			[{<\emph{target\_type}>}
+				[{<\emph{target\_label}>}
+					[{<\emph{sim\_source}>}
+						[labels.txt, edge path={}]
+						[{<\emph{sim\_metric\_1}>.csv}, edge path={}]
+						[{<\emph{sim\_metric\_2}>.csv}, edge path={}]
+						[{\dots}, edge path={}]
+						[{<\emph{sim\_metric\_N}>.csv}, edge path={}]
+					]
+				]
+			]
+		]
+	]
+\end{forest}

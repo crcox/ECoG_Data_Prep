@@ -1,0 +1,78 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage[left=1.00in, right=1.00in, top=1.00in, bottom=1.00in]{geometry}
+
+\usepackage{forest}
+
+\definecolor{folderbg}{RGB}{124,166,198}
+\definecolor{folderborder}{RGB}{110,144,169}
+\definecolor{filebg}{RGB}{255,255,255}
+\definecolor{fileborder}{RGB}{0,0,0}
+\def\Size{4pt}
+\tikzset{
+	folder/.pic={
+		\filldraw[draw=folderborder,top color=folderbg!50,bottom color=folderbg]
+		(-1.05*\Size,0.2\Size+5pt) rectangle ++(.75*\Size,-0.2\Size-5pt);  
+		\filldraw[draw=folderborder,top color=folderbg!50,bottom color=folderbg]
+		(-1.15*\Size,-\Size) rectangle (1.15*\Size,\Size);
+	}
+}
+
+\author{Christopher R. Cox}
+\title{ECoG Data Prep Manual}
+\newcommand{\matlab}[0]{MATLAB\textsuperscript{\textregistered}}
+\begin{document}
+	\maketitle
+	
+This collection of \matlab{} code revolves around the function \texttt{setup\_data}, which has several goals:
+
+\begin{enumerate}
+	\item To preprocess the local field potentials for each subject so that they are ready for later analysis. In particular, the current focus is on preparing the data for sparse regression.
+	\item To install various preprocessed versions of the dataset into an organized directory structure. One motivation for generating many preprocessed datasets to facilitate parallel analyses, potentially on multiple computers (for example, as part of a \emph{High Throughput Computing} workflow).
+	\item To enforce uniformity and conventions by running all preprocessing through a single interface.
+\end{enumerate}
+
+The function \texttt{setup\_data} implements several procedures:
+
+\begin{enumerate}
+	\item Selecting subsets of the full timeseries, with sensitivity to the sampling rate of each dataset. Subsets are called ``\emph{windows}''. The window is defined in terms of an \emph{onset} and a \emph{duration}.
+	\item Basic down-sampling via ``\emph{box-car}'' averaging, which involves averaging neighboring time points within non-overlapping blocks of time. Averaging is unweighted withing blocks, so all points in time within the block are valued equally. The size of the box-car is specified in milliseconds; the code is aware of the sampling rate as long as it is stored within the data structure that contains the local field potential data.
+	\item Averaging over sessions.
+	\item Detection of outlying rows or columns in the data matrix. The data matrix has a row for each item in the experiment, and a column for each electrode at each point in time (within the defined window, after down-sampling).
+	
+	The current procedure checks for highly extreme average row or average column values. In a upcoming revision, this process will involve rejecting of trials that are thought to include epileptic spikes (identified by a low-pass filter with $50 \mu$volt threshold).
+\end{enumerate}
+
+Preprocessed data will be output into a deeply nested directory that captures information about the preprocessing procedure. Figure \ref{fig.nested_directory_output} contains an example of this nested output structure. The top level, \texttt{avg} indicates that repetitions of the same item were averaged together over sessions. The following directories can almost be thought of as key-value pairs. For example, \texttt{BoxCar} would be the key, and \texttt{010} is the value (indicating that the data were down-sampled using a 10 ms box-car average); \texttt{WindowStart} would be the key, and \texttt{0200} would be the value (indicating that the window onset is 200 ms after stimulus onset).
+
+\begin{figure}
+\begin{verbatim}
+<datarootout>/avg/BoxCar/010/WindowStart/0200/WindowSize/1000/s01_raw.mat
+<datarootout>/avg/BoxCar/010/WindowStart/0200/WindowSize/1000/s02_raw.mat
+...
+<datarootout>/avg/BoxCar/010/WindowStart/0200/WindowSize/1000/sNN_raw.mat
+<datarootout>/avg/BoxCar/010/WindowStart/0200/WindowSize/1000/metadata_raw.mat
+\end{verbatim}
+\caption{Example of nested directory structure where output is written. \texttt{datarootout} is a variable that can be set through a parameter to \texttt{setup\_data}. If not set, the default is to build the tree in the directory where the command is being executed (e.g., the current working directory of an interactive \matlab{} session, or the shell current working directory if launching a MCC compiled executable on a shared computing system).}
+\label{fig.nested_directory_output}
+\end{figure}
+
+It relies on several pieces of data to be located somewhere on your file system. Schemas for these data structures are shown in Figures \ref{fig.metaroot} and \ref{fig.dataroot}.
+
+\begin{figure}
+\input{metaroot_tree}
+\caption{Directory structure under \texttt{metaroot}.}
+\label{fig.metaroot}
+\end{figure}
+
+\begin{figure}
+\input{dataroot_tree}
+\caption{Directory structure under \texttt{dataroot}.}
+\label{fig.dataroot}
+\end{figure}
+
+\end{document}
