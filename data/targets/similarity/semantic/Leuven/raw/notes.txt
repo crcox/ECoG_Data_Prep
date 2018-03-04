@@ -1,0 +1,16 @@
+Hi Chris,
+
+Okay, I've attached two files:
+
+- Excel file: first worksheet lists items in ECog for which there exists the same (or very similar) item in Leuven dataset. Where the item names differ, the one in the Leuven column indicates the name used in the Leuven dataset (e.g. "bear" in ECog is "polar_bear" in Leuven, since there is no generic bear in Leuven set).
+
+-  text file that lists the item-by-feature matrix for all items in the Leuven norms (including additional categories like professions and fruits). Some of the feature names in this file are not translated but I think features relevant to animals and artifacts are all listed in English. From this file you will want to (1) pull out all the 63 items from the ECog data as listed in the other file, then (2) delete all columns with all zero values. That will give you an item-by-feature matrix for the 63 items from ECog that are in the Leuven set, and we can go from there.
+
+Maybe it would be good to look at a cluster plot or MDS of this structure to ensure it makes sense.
+
+
+Chris, to answer the question in your prior email: These are the binary vectors I created to train the Rumelhart model. I think I just took any feature with a non-zero value and treated it as a 1. I think that the feature frequency values in the dataset are a bit misleading, in that they blend what people know about an item with what they are willing to say in a feature-listing task. (like, everybody knows that chipmunks appear in your back yard but only a few people say it). If the vectors are meant to capture what we know, rather than what we are willing to say, then including everything seems the way to go. 
+With 63 items in 5 dimensions, that's 315 data points, effectively---pretty good! I will look forward to seeing what happens...
+
+T
+PS:  Incidentally, I also have the internal representations learned by a Rumelhart network for the 351 items in the Leuven norms. In the attached files I pulled out the 63 overlap items. The cluster plot shows a hierarchical cluster analysis using Euclidean distance and Ward's method for generating the tree. I think it is not quite as clean as the plots generated from cosine distance on the raw feature lists, but still pretty good. I mention this in case, at some point, we want to connect these analyses to simulation data.

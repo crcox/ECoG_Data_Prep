@@ -44,6 +44,7 @@ function setup_data(varargin)
         % they will be passed directly from the Unix/Windows terminal.
         addParameter(p, 'onset',[]);
         addParameter(p, 'duration',[]);
+        addParameter(p, 'baseline','0');
         addParameter(p, 'subjects', '1 2 3 5 7 8 9 10', @ischar);
         addParameter(p, 'boxcar', '0', @ischar);
         addParameter(p, 'average', '1', @ischar);
@@ -74,6 +75,7 @@ function setup_data(varargin)
         %% Setup
         WindowStartInMilliseconds = str2double(p.Results.onset);
         WindowSizeInMilliseconds = str2double(p.Results.duration);
+        BaselineSizeInMilliseconds = str2double(p.Results.baseline);
         BoxCarSize = str2double(p.Results.boxcar);
         AverageOverSessions = str2double(p.Results.average);
         OVERWRITE = str2double(p.Results.overwrite);
@@ -86,6 +88,7 @@ function setup_data(varargin)
         % the Matlab command line or script, or parsed from a json file.
         addParameter(p, 'onset',[]);
         addParameter(p, 'duration',[]);
+        addParameter(p, 'baseline',0);
         addParameter(p, 'subjects', [1:3,5,7:10], @isnumeric);
         addParameter(p, 'boxcar', 0);
         addParameter(p, 'average', 1);
@@ -117,6 +120,7 @@ function setup_data(varargin)
         %% Setup
         WindowStartInMilliseconds = p.Results.onset;
         WindowSizeInMilliseconds = p.Results.duration;
+        BaselineSizeInMilliseconds = p.Results.baseline;
         BoxCarSize = p.Results.boxcar;
         AverageOverSessions = p.Results.average;
         OVERWRITE = p.Results.overwrite;
@@ -174,27 +178,30 @@ function setup_data(varargin)
     % All subjects have the same order
     file_stim_order = fullfile(STIM_DIR, 'picture_namingERP_order.csv');
     file_stim_key = fullfile(STIM_DIR, 'picture_namingERP_key.csv');
+    
+    stim_order = readtable(file_stim_order);
+    stim_key = readtable(file_stim_key);
+% 
+%     fid = fopen(file_stim_order);
+%     [~] = textscan(fid,'%s %s %s',1,'Delimiter',','); % stim_order_head
+%     stim_order = textscan(fid,'%d %d %d','Delimiter',',');
+%     fclose(fid);
+% 
+%     fid = fopen(file_stim_key);
+%     [~] = textscan(fid,'%s %s',1,'Delimiter',','); % stim_key_head
+%     stim_key = textscan(fid,'%d %s','Delimiter',',');
+%     fclose(fid);
 
-    fid = fopen(file_stim_order);
-    [~] = textscan(fid,'%s %s %s',1,'Delimiter',','); % stim_order_head
-    stim_order = textscan(fid,'%d %d %d','Delimiter',',');
-    fclose(fid);
-
-    fid = fopen(file_stim_key);
-    [~] = textscan(fid,'%s %s',1,'Delimiter',','); % stim_key_head
-    stim_key = textscan(fid,'%d %s','Delimiter',',');
-    fclose(fid);
-
-    nitems = numel(stim_key{2});
-    nsessions = numel(unique(stim_order{1}));
+    nitems = numel(stim_key.Stimulus);
+    nsessions = numel(unique(stim_order.Session));
 
     %% Ensure stimulus labels are sorted by their index
-    [stim_key{1},ix] = sort(stim_key{1});
-    stim_key{2} = stim_key{2}(ix);
+    [stim_key.ItemIndex,ix] = sort(stim_key.ItemIndex);
+    stim_key.Stimulus = stim_key.Stimulus(ix);
 
     %% Generate sort indexes
-    x = tabulate(stim_order{1});
-    stim_order_ix = mat2cell(stim_order{3}, x(:,2), 1);
+    x = tabulate(stim_order.Session);
+    stim_order_ix = mat2cell(stim_order.ItemIndex, x(:,2), 1);
     stim_sort_ix = cell(size(x,1),1);
     for i = 1:size(x,1)
         [~,stim_sort_ix{i}] = sort(stim_order_ix{i});
@@ -211,7 +218,7 @@ function setup_data(varargin)
     metadata = struct(...
       'subject',num2cell(SUBJECTS),...
       'targets',struct(),...
-      'stimuli',stim_key(2),...
+      'stimuli',{stim_key.Stimulus},...
       'filters',struct(),...
       'coords',struct(),...
       'cvind',[],...
@@ -328,7 +335,7 @@ function setup_data(varargin)
             M.sessions = [];
             M.nrow = 100;
         else
-            M.sessions = stim_order{1};
+            M.sessions = stim_order.Session;
             M.nrow = 400;
         end
         M.AverageOverSessions = AverageOverSessions;
@@ -477,10 +484,9 @@ function setup_data(varargin)
 
         ecoord = ELECTRODE{SUBJECTS(iSubject)};
         edata = cellstr(Pt.LFP.DIM(2).label);
-
-        [zc,zd] = ismember(ecoord, edata);
-        zd = zd(zc);
-
+        zc = ismember(ecoord, edata);
+        ecoord = ecoord(zc);
+        
         ntp = (WindowSizeInMilliseconds / BoxCarSize);
         xyz = XYZ{SUBJECTS(iSubject)}(zc,:);
         xyzc = mat2cell(xyz, ones(size(xyz,1),1), size(xyz,2));
@@ -495,43 +501,84 @@ function setup_data(varargin)
         
         COORDS = struct('orientation','mni','labels',{trode_repeated},'ijk',[],'ind',[],'xyz',xyz_repeated);
 
-        Pt.LFP.DATA = Pt.LFP.DATA(:,zd);
-
-        onsetIndex = cell(1,4);
         tagfmt = F.sessiontag;
+        stim_order.OnsetIndex = zeros(size(stim_order,1),1);
         for iSession = 1:nsessions
             tagname = sprintf(tagfmt,iSession);
-            onsetIndex{iSession} = Pt.(tagname);
+            z = stim_order.Session == iSession;
+            stim_order.OnsetIndex(z) = Pt.(tagname);
         end
 
         Hz = 1 / Pt.LFP.DIM(1).interval; % ticks per second
-        boxcar_size = (BoxCarSize / 1000) * Hz;
+        boxcar_size  = (BoxCarSize / 1000) * Hz;
         window_start = (WindowStartInMilliseconds / 1000) * Hz;
-        window_size = (WindowSizeInMilliseconds / 1000) * Hz; % in ticks (where a tick is a single time-step).
+        window_size  = ( WindowSizeInMilliseconds / 1000) * Hz; % in ticks (where a tick is a single time-step).
+        baseline_size  = ( BaselineSizeInMilliseconds / 1000) * Hz; % in ticks (where a tick is a single time-step).
 
         % Will return a session -by- electrode cell array, each containing a
         % trial -by- time matrix.
-        ECA = arrangeElectrodeData(Pt.LFP.DATA, onsetIndex, [window_start, window_size]);
-
-        % Sort and average time-points
-        nElectrodes = size(ECA,2);
-        for iElectrode = 1:nElectrodes
-            for iSession = 1:4
-                ECA{iSession,iElectrode} = ECA{iSession,iElectrode}(stim_sort_ix{iSession},:);
-                if boxcar_size > 1
-                    ECA{iSession,iElectrode} = boxcarmean(ECA{iSession,iElectrode},boxcar_size,'KeepPartial',0);
-                end
-            end
-            % Average Sessions
-            if AverageOverSessions
-                tmp = cat(3,ECA{:,iElectrode});
-                ECA{1,iElectrode} = mean(tmp,3);
-            end
-        end
+        ECA = pull_trial_profiles(Pt.LFP, stim_order, [window_start, window_size], baseline_size, ecoord);
+%         ECA = arrangeElectrodeData(Pt.LFP.DATA, onsetIndex, [window_start, window_size]);
+        % Average over sessions?
         if AverageOverSessions
-            ECA(2:end,:) = [];
+            % data array is sessions x items x time, and mean operates over
+            % the first dimension by default.
+            for iElectrode = 1:numel(ECA)
+                ECA(iElectrode).data = squeeze(mean(ECA(iElectrode).data));
+            end
+        else
+            % permute will make items the first dimension, and the reshape
+            % will then block rows by session
+            for iElectrode = 1:numel(ECA)
+                ECA(iElectrode).data = reshape((permute(ECA(iElectrode).data,[2,1,3])), [], window_size);
+            end
         end
-        X = cell2mat(ECA);
+
+        % Boxcar Average time-points
+        % ==========================
+        % Algorithm :
+        % 1. Trim the window so that it is evenly divisible by the boxcar.
+        % 2. Transpose the data to make it time by item.
+        % 3. Reshape to be boxcar_size by adj_window_size / boxcar_size by
+        % item.
+        % 4. Take mean over first dimension (default of mean()).
+        % 5. Squeeze out the now singleton first dimension
+        % 6. Transpose back to item by time.
+        a = 1;
+        b = window_size - rem(window_size, boxcar_size);
+        c = b / boxcar_size;
+        for iElectrode = 1:numel(ECA)
+            x = ECA(iElectrode).data(:,a:b);
+            r = size(x, 1);
+            ECA(iElectrode).data = squeeze(mean(reshape(x',boxcar_size,c,r)))';
+        end
+        
+        % Compose a single matrix, where rows are items and columns are
+        % time points nested within electrodes. This is done by simply
+        % concatenating the matrices associated with each electrode
+        % columnwise.
+        X = cat(2, ECA.data);
+        
+        % This is the old approach... will be deleted soon.
+%         nElectrodes = size(ECA,2);
+%         for iElectrode = 1:nElectrodes
+%             for iSession = 1:4
+%                 ECA{iSession,iElectrode} = ECA{iSession,iElectrode}(stim_sort_ix{iSession},:);
+%                 if boxcar_size > 1
+%                     ECA{iSession,iElectrode} = boxcarmean(ECA{iSession,iElectrode},boxcar_size,'KeepPartial',0);
+%                 end
+%             end
+%             % Average Sessions
+%             if AverageOverSessions
+%                 tmp = cat(3,ECA{:,iElectrode});
+%                 ECA{1,iElectrode} = mean(tmp,3);
+%             end
+%         end
+%         if AverageOverSessions
+%             ECA(2:end,:) = [];
+%         end
+%         X = cell2mat(ECA);
+
         [~,reduxFilter] = removeOutliers(X);
         y = COORDS.xyz(:,2);
         m = median(y);

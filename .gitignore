@@ -9,3 +9,12 @@ meta/electrodes/MMNI152_T1_2mm_brain_nocereb.nii.gz
 meta/coordinates/MNI_N27_SurfVol.nii
 meta/electrodes/MNI_N27_SurfVol.nii
 build-csf-setup_data_ecog-logfiles/*
+.Rproj.user/
+.Rhistory
+ECoG_Data_Prep.Rproj
+*.zip
+data/targets/similarity/semantic/Dilkinea_cosine.mat
+data/targets/similarity/semantic/Dilkinea/raw/McRae_feature_norms_CONCS_FEATS_concstats_brm.xlsx
+data/targets/similarity/semantic/Dilkinea/raw/revised-Cree&McRae-feats_CRCox.xlsx
+data/targets/similarity/semantic/Dilkinea/raw/revised-Cree&McRae-feats.xlsx
+data/targets/similarity/semantic/Leuven/raw/Leuven_and_ECog_Items.xlsx
