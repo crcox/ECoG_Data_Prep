@@ -135,6 +135,7 @@ function setup_data(varargin)
     end
     META_DIR = p.Results.metaroot;
     STIM_DIR = fullfile(META_DIR,'stimuli');
+    FILTER_DIR = fullfile(META_DIR,'filters');
     COORD_DIR = fullfile(META_DIR,'coords');
     SIM_DIR = fullfile(META_DIR,'similarity');
     TARGET_DIR = fullfile(META_DIR,'targets');
@@ -588,13 +589,19 @@ function setup_data(varargin)
         M = registerFilter(M, 'colfilter', 2, reduxFilter.voxels);
         M = registerFilter(M, 'anterior',  2, y > m);
         M = registerFilter(M, 'posterior', 2, y <= m);
+        tmp = load(fullfile(FILTER_DIR,'DilkineaSplit','filter.mat'),'filter');
         if AverageOverSessions
             M = registerFilter(M, 'animate', 1, [true(50,1);false(50,1)]);
             M = registerFilter(M, 'inanimate', 1, [false(50,1);true(50,1)]);
+            M = registerFilter(M, 'DilkineaSplit1', 1, tmp.filter == 0);
+            M = registerFilter(M, 'DilkineaSplit2', 1, tmp.filter == 1);
         else
-            M = registerFilter(M, 'animate', 1, repmat([true(50,1);false(50,1)],4,1));
-            M = registerFilter(M, 'inanimate', 1, repmat([false(50,1);true(50,1)],4,1));
+            M = registerFilter(M, 'animate', 1, repmat([true(50,1);false(50,1)],nsessions,1));
+            M = registerFilter(M, 'inanimate', 1, repmat([false(50,1);true(50,1)],nsessions,1));
+            M = registerFilter(M, 'DilkineaSplit1', 1, repmat(tmp.filter,nsessions,1) == 0);
+            M = registerFilter(M, 'DilkineaSplit2', 1, repmat(tmp.filter,nsessions,1) == 1);
         end
+
         M.coords = COORDS;
         M.ncol = size(X,2);
         M.samplingrate = Hz;
