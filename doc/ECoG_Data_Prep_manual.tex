@@ -28,26 +28,45 @@
 \begin{document}
 	\maketitle
 	
+\section{Overview}
 This collection of \matlab{} code revolves around the function \texttt{setup\_data}, which has several goals:
 
 \begin{enumerate}
-	\item To preprocess the local field potentials for each subject so that they are ready for later analysis. In particular, the current focus is on preparing the data for sparse regression.
-	\item To install various preprocessed versions of the dataset into an organized directory structure. One motivation for generating many preprocessed datasets to facilitate parallel analyses, potentially on multiple computers (for example, as part of a \emph{High Throughput Computing} workflow).
-	\item To enforce uniformity and conventions by running all preprocessing through a single interface.
+	\item
+	To preprocess the local field potentials for each subject so that they are ready for later analysis.
+	In particular, the current focus is on preparing the data for sparse regression.
+	\item
+	To install various preprocessed versions of the dataset into an organized directory structure.
+	One motivation for generating many preprocessed datasets is to facilitate parallel analyses, potentially on multiple computers (for example, as part of a \emph{High Throughput Computing} workflow).
+	\item
+	To enforce uniformity and conventions by running all preprocessing through a single interface.
 \end{enumerate}
 
 The function \texttt{setup\_data} implements several procedures:
 
 \begin{enumerate}
-	\item Selecting subsets of the full timeseries, with sensitivity to the sampling rate of each dataset. Subsets are called ``\emph{windows}''. The window is defined in terms of an \emph{onset} and a \emph{duration}.
-	\item Basic down-sampling via ``\emph{box-car}'' averaging, which involves averaging neighboring time points within non-overlapping blocks of time. Averaging is unweighted withing blocks, so all points in time within the block are valued equally. The size of the box-car is specified in milliseconds; the code is aware of the sampling rate as long as it is stored within the data structure that contains the local field potential data.
-	\item Averaging over sessions.
-	\item Detection of outlying rows or columns in the data matrix. The data matrix has a row for each item in the experiment, and a column for each electrode at each point in time (within the defined window, after down-sampling).
+	\item
+	Selecting subsets of the full timeseries, with sensitivity to the sampling rate of each dataset.
+	Subsets are called ``\emph{windows}''.
+	The window is defined in terms of an \emph{onset} and a \emph{duration}.
+	\item
+	Basic down-sampling via ``\emph{box-car}'' averaging, which involves averaging neighboring time points within non-overlapping blocks of time.
+	Averaging is unweighted withing blocks, so all points in time within the block are valued equally.
+	The size of the box-car is specified in milliseconds; the code is aware of the sampling rate as long as it is stored within the data structure that contains the local field potential data.
+	\item
+	Averaging over sessions.
+	\item
+	Detection of outlying rows or columns in the data matrix.
+	The data matrix has a row for each item in the experiment, and a column for each electrode at each point in time (within the defined window, after down-sampling).
 	
-	The current procedure checks for highly extreme average row or average column values. In a upcoming revision, this process will involve rejecting of trials that are thought to include epileptic spikes (identified by a low-pass filter with $50 \mu$volt threshold).
+	The current procedure checks for highly extreme average row or average column values.
+	In a upcoming revision, this process will involve rejecting of trials that are thought to include epileptic spikes (identified by a low-pass filter with $50 \mu$volt threshold).
 \end{enumerate}
 
-Preprocessed data will be output into a deeply nested directory that captures information about the preprocessing procedure. Figure \ref{fig.nested_directory_output} contains an example of this nested output structure. The top level, \texttt{avg} indicates that repetitions of the same item were averaged together over sessions. The following directories can almost be thought of as key-value pairs. For example, \texttt{BoxCar} would be the key, and \texttt{010} is the value (indicating that the data were down-sampled using a 10 ms box-car average); \texttt{WindowStart} would be the key, and \texttt{0200} would be the value (indicating that the window onset is 200 ms after stimulus onset).
+Preprocessed data will be output into a deeply nested directory that captures information about the preprocessing procedure.
+Figure \ref{fig.nested_directory_output} contains an example of this nested output structure. The top level, \texttt{avg} indicates that repetitions of the same item were averaged together over sessions.
+The following directories can almost be thought of as key-value pairs. For example, \texttt{BoxCar} would be the key, and \texttt{010} is the value (indicating that the data were down-sampled using a 10 ms box-car average);
+\texttt{WindowStart} would be the key, and \texttt{0200} would be the value (indicating that the window onset is 200 ms after stimulus onset).
 
 \begin{figure}
 \begin{verbatim}
@@ -57,11 +76,31 @@ Preprocessed data will be output into a deeply nested directory that captures in
 <datarootout>/avg/BoxCar/010/WindowStart/0200/WindowSize/1000/sNN_raw.mat
 <datarootout>/avg/BoxCar/010/WindowStart/0200/WindowSize/1000/metadata_raw.mat
 \end{verbatim}
-\caption{Example of nested directory structure where output is written. \texttt{datarootout} is a variable that can be set through a parameter to \texttt{setup\_data}. If not set, the default is to build the tree in the directory where the command is being executed (e.g., the current working directory of an interactive \matlab{} session, or the shell current working directory if launching a MCC compiled executable on a shared computing system).}
+\caption{
+	An example of nested directory structure where output is written.
+	\texttt{datarootout} is a variable that can be set through a parameter to \texttt{setup\_data}.
+	If not set, the default is to build the tree in the directory where the command is being executed (e.g., the current working directory of an interactive \matlab{} session, or the shell current working directory if launching a MCC compiled executable on a shared computing system).
+}
 \label{fig.nested_directory_output}
 \end{figure}
 
-It relies on several pieces of data to be located somewhere on your file system. Schemas for these data structures are shown in Figures \ref{fig.metaroot} and \ref{fig.dataroot}.
+\section{Usage}
+
+\texttt{setup\_data} is called by defining several parameters:
+
+\begin{itemize}
+	\item \texttt{\textbf{onset}}: a positive integer, representing a number of milliseconds. Determines the beginning of the window.
+	\item \texttt{\textbf{duration}}: a positive integer, representing a number of milliseconds. Determines the length of the window.
+	\item \texttt{\textbf{subjects}}: The numeric portion of the subject ID for one of more subjects.
+	\item \texttt{\textbf{IndividualMetadata}}: A true/false logical variable that indicates whether a separate metadata file should be produced for each subject (true), or if a single metadata file should contain information about all subjects (false; the default).
+	\item \texttt{\textbf{boxcar}}: A positive integer (or zero), representing a number of milliseconds.
+	This defines the resolution to down-sample the data to.
+	The down-sampling is achieved through a unweighted average of non-overlapping sets of neighboring time points (i.e., ``boxcars'').
+	\item \texttt{\textbf{duration}}: a positive integer, representing a number of milliseconds. Determines the length of the window.
+\end{itemize}
+
+It relies on several pieces of data to be located somewhere on your file system.
+Schemas for these data structures are shown in Figures \ref{fig.metaroot} and \ref{fig.dataroot}.
 
 \begin{figure}
 \input{metaroot_tree}
