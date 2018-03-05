@@ -1,8 +1,8 @@
 library('dplyr')
 library('ggplot2')
 
-S <- as.matrix(read.csv(file = '../../targets/similarity/semantic/Dilkinea/cosine.csv', header = FALSE))
-labs <- read.csv(file = '../../targets/similarity/semantic/Dilkinea/labels.txt', header = FALSE, stringsAsFactors = FALSE)[[1]]
+S <- as.matrix(read.csv(file = 'data/targets/similarity/semantic/Dilkinea/cosine.csv', header = FALSE))
+labs <- read.csv(file = 'data/targets/similarity/semantic/Dilkinea/labels.txt', header = FALSE, stringsAsFactors = FALSE)[[1]]
 rownames(S) <- labs
 colnames(S) <- labs
 
@@ -96,8 +96,8 @@ cat(sprintf('Spearman: %.4f\n', cor(S.S1[z],S.S2[z],method = 'spearman')))
 cat(sprintf('Kendall: %.4f\n', cor(S.S1[z],S.S2[z],method = 'kendall')))
 cat(sprintf('\n'))
 
-write(as.character(Splits$label), file = "labels.txt", ncolumns = 1)
-write(as.numeric(Splits$split-1),file = "filter.txt",ncolumns = 1)
+# write(as.character(Splits$label), file = "filters/DilkineaSplit/labels.txt", ncolumns = 1)
+# write(as.numeric(Splits$split-1),file = "filters/DilkineaSplit/filter.txt",ncolumns = 1)
 
 # # Random splits
 # x <- rep(c(1,2),25)
