@@ -1,4 +1,4 @@
-function [ E ] = pull_trial_profiles(EEG, TrialInfo, window, baseline, electrodes)
+function [ E ] = pull_trial_profiles(EEG, TrialInfo, window, baseline, varargin)
 % PULL_TRIAL_PROFILES Returns a structure with a field for each electrode.
 %
 % Input:
@@ -28,15 +28,24 @@ function [ E ] = pull_trial_profiles(EEG, TrialInfo, window, baseline, electrode
 %  (so trial 1 in each session can be interpretted as the same stimulus.)
 %
 % Chris Cox 01 March 2018
-    if nargin < 5
-        electrodes = cellstr(EEG.DIM(2).label);
-    end
+
+    p = inputParser();
+    addRequired(p, 'EEG', @isstruct);
+    addRequired(p, 'TrialInfo', @istable);
+    addRequired(p, 'window', @isvector);
+    addRequired(p, 'baseline', @isscalar);
+    addOptional(p, 'electrodes', cellstr(EEG.DIM(2).label), @iscellstr);
+    addParameter(p, 'ReturnBaseline', true, @islogical);
+    parse(p, EEG, TrialInfo, window, baseline, varargin{:});
+    
     allelectrodes = cellstr(EEG.DIM(2).label);
     sessions = sort(unique(TrialInfo.Session));
-    E = struct('label',electrodes,'data',[]);
-    for k = 1:numel(electrodes);
-        currentElectrodeFilter = strcmp(electrodes{k}, allelectrodes);
+    E = struct('label',p.Results.electrodes,'data',[]);
+    for k = 1:numel(p.Results.electrodes);
+        currentElectrodeFilter = strcmp(p.Results.electrodes{k}, allelectrodes);
         X = zeros(4, max(TrialInfo.Trial), window(2));
+        B = zeros(4, max(TrialInfo.Trial), baseline);
+        B_raw = zeros(4, max(TrialInfo.Trial), baseline);
         for i = 1:numel(sessions)
             session = sessions(i);
             z = TrialInfo.Session == session;
@@ -49,6 +58,8 @@ function [ E ] = pull_trial_profiles(EEG, TrialInfo, window, baseline, electrode
                     a = onset - baseline;
                     b = onset - 1;
                     baseline_mean = mean(EEG.DATA(a:b,currentElectrodeFilter));
+                    B(session,stimid,:) = EEG.DATA(a:b,currentElectrodeFilter);
+                    B_raw(session,stimid,:) = EEG.DATA(a:b,currentElectrodeFilter);
                 else
                     baseline_mean = 0;
                 end
@@ -60,6 +71,10 @@ function [ E ] = pull_trial_profiles(EEG, TrialInfo, window, baseline, electrode
             end
         end
         E(k).data = X;
+        if p.Results.ReturnBaseline
+            E(k).baseline = B;
+            E(k).baseline_raw = B_raw;
+        end
     end
 end
 
