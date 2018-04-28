@@ -1,0 +1,1 @@
+For Pt09, there were two coordinates labeled E02. One of them should have been F02. This has been corrected in the CSV and in the electrodes.mat file.
