@@ -109,10 +109,14 @@ function Xbc = boxcar_average_timepoints(X, boxcar_size)
         b = window_size - rem(window_size, boxcar_size);
         c = b / boxcar_size;
         Xbc = nan(nsessions, nitems, c);
-        for i = 1:nsessions
-            x = squeeze(X(i,:,a:b));
-            r = size(x, 1);
-            Xbc(i,:,:) = squeeze(mean(reshape(x',boxcar_size,c,r)))';
+        if c < window_size
+            for i = 1:nsessions
+                x = squeeze(X(i,:,a:b));
+                r = size(x, 1);
+                Xbc(i,:,:) = squeeze(mean(reshape(x',boxcar_size,c,r),1))';
+            end
+        else
+            Xbc = X;
         end
     end
 end
