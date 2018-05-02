@@ -59,8 +59,8 @@ function [ E ] = pull_trial_profiles(EEG, TrialInfo, window, baseline, varargin)
             continue;
         end
         X = zeros(4, max(TrialInfo.Trial), window_size);
-        B = zeros(4, max(TrialInfo.Trial), baseline);
-        B_raw = zeros(4, max(TrialInfo.Trial), baseline);
+        B = zeros(4, max(TrialInfo.Trial), baseline_size);
+        B_raw = zeros(4, max(TrialInfo.Trial), baseline_size);
         for i = 1:numel(sessions)
             session = sessions(i);
             z = TrialInfo.Session == session;
