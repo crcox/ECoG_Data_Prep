@@ -53,7 +53,7 @@ function [ E ] = pull_trial_profiles(EEG, TrialInfo, window, baseline, varargin)
     allelectrodes = cellstr(EEG.DIM(2).label);
     sessions = sort(unique(TrialInfo.Session));
     E = struct('label',p.Results.electrodes,'data',[]);
-    for k = 1:numel(p.Results.electrodes);
+    for k = 1:numel(p.Results.electrodes)
         currentElectrodeFilter = strcmp(p.Results.electrodes{k}, allelectrodes);
         if ~any(currentElectrodeFilter)
             continue;
@@ -65,11 +65,11 @@ function [ E ] = pull_trial_profiles(EEG, TrialInfo, window, baseline, varargin)
             session = sessions(i);
             z = TrialInfo.Session == session;
             SessionInfo = TrialInfo(z,:);
-            for j = 1:size(SessionInfo,1);
+            for j = 1:size(SessionInfo,1)
                 z = SessionInfo.Trial == j;
                 onset = SessionInfo.OnsetIndex(z);
                 stimid = SessionInfo.ItemIndex(z);
-                if baseline > 0;
+                if baseline > 0
                     a = onset - baseline_size;
                     b = onset - 1;
                     baseline_mean = mean(EEG.DATA(a:b,currentElectrodeFilter));

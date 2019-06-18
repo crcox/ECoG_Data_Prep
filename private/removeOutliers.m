@@ -40,3 +40,18 @@ function [Aredux, reduxFilter]=removeOutliers(A)
     reduxFilter.words(outliers) = false;
     reduxFilter.words = reduxFilter.words & any(A,2)';
 end
+
+function z = zscore(x,dim)
+    if isvector(x)
+        m = mean(x);
+        s = std(x);
+        z = (x - m) ./ s;
+    else
+        if nargin < 2
+            dim = 1;
+        end
+        m = mean(x,dim);
+        s = std(x,[],dim);
+        z = bsxfun(@rdivide, bsxfun(@minus, x, m), s);
+    end
+end

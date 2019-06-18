@@ -7,7 +7,7 @@ function setup_data(varargin)
         % file, or a path to a directory that contains a file named
         % 'params.json'.
         [p,f,e] = fileparts(varargin{1});
-        if strcmp('.json', e);
+        if strcmp('.json', e)
             jsonpath = varargin{1};
         elseif isempty(e)
             jsonpath = fullfile(p,f,'params.json');
@@ -27,7 +27,7 @@ function setup_data(varargin)
 
     % If nargin < 2, jsonpath will be set to something. It may not be a
     % valid file, so 'jsonload()' may result in a fatal error.
-    if isempty(jsonpath);
+    if isempty(jsonpath)
         isjsoncfg = false;
     else
         jdat = loadjson(jsonpath);
@@ -169,6 +169,7 @@ function setup_data(varargin)
 
     fprintf('Average over sessions: %d\n', AverageOverSessions);
     fprintf('Box-car size for time-series averaging: %d\n', BoxCarSize);
+    fprintf('Size of baseline window (pre stim onset): %d\n', BaselineSizeInMilliseconds);
     fprintf('Beginning of time selection window: %d ms post stim onset\n', WindowStartInMilliseconds);
     fprintf('Length of time window selection: %d ms\n', WindowSizeInMilliseconds);
     fprintf('Processed data will be written to:\n\t%s\n', DATA_DIR_OUT);
@@ -229,6 +230,7 @@ function setup_data(varargin)
       'samplingrate',[],...
       'AverageOverSessions',[],...
       'BoxCarSize',[],...
+      'BaselineSize',[],...
       'WindowStartInMilliseconds',[],...
       'WindowSizeInMilliseconds',[]...
     );
@@ -332,7 +334,7 @@ function setup_data(varargin)
         % to create filters for that.
         FILTERS = struct('label',[],'dimension',[],'filter',[]);
         % ---------
-        if AverageOverSessions == 1;
+        if AverageOverSessions == 1
             M.sessions = [];
             M.nrow = 100;
         else
@@ -341,6 +343,7 @@ function setup_data(varargin)
         end
         M.AverageOverSessions = AverageOverSessions;
         M.BoxCarSize = BoxCarSize;
+        M.BaselineSize = BaselineSizeInMilliseconds;
         M.WindowStartInMilliseconds = WindowStartInMilliseconds;
         M.WindowSizeInMilliseconds = WindowSizeInMilliseconds;
         if numel(fieldnames(M.filters)) == 0
@@ -355,7 +358,7 @@ function setup_data(varargin)
     % NOTE: In the source data, naming conventions are not consistent. The
     % following structures explicitly represent all the file and field names that
     % need to be referenced.
-    filelist = struct('subject',num2cell(1:10), 'filename',[], 'variables', [], 'sessions', [], 'sessiontag', []);
+    filelist = struct('subject',num2cell(1:12), 'filename',[], 'variables', [], 'sessions', [], 'sessiontag', []);
     switch datacode
         % This bit is necessary because the raw data were not stored with a
         % consistent naming convention.
@@ -376,20 +379,20 @@ function setup_data(varargin)
             filelist(3).sessions = {1:4};
             filelist(3).sessiontag = 'Tag_ss%02d_all';
             % Subject 4
-            filelist(4).filename = [];
-            filelist(4).variables = [];
-            filelist(4).sessions = [];
-            filelist(4).sessiontag = [];
+            filelist(4).filename = 'Pt04_namingERP_2017.mat';
+            filelist(4).variables = {'Pt04_namingERP_anony_SS01_02','Pt04_namingERP_anony_SS03_04'};
+            filelist(4).sessions = {1:2,3:4};
+            filelist(4).sessiontag = 'tag_ss%02d';
             % Subject 5
             filelist(5).filename = 'namingERP_Pt05.mat';
             filelist(5).variables = {'namingERP_data_Pt05'};
             filelist(5).sessions = {1:4};
             filelist(5).sessiontag = 'tag_ss%02d';
             % Subject 6
-            filelist(6).filename = 'namingERP_Pt06.mat';
-            filelist(6).variables = {'namingERP_data_Pt06'};
+            filelist(6).filename = 'Pt06_namingERP_anony.mat';
+            filelist(6).variables = {'Pt06_namingERP_anony'};
             filelist(6).sessions = {1:4};
-            filelist(6).sessiontag = [];
+            filelist(6).sessiontag = 'tag%02d_all';
             % Subject 7
             filelist(7).filename = 'namingERP_Pt07.mat';
             filelist(7).variables = {'namingERPdataPt07','namingERPdataPt07_ss0304'};
@@ -410,6 +413,17 @@ function setup_data(varargin)
             filelist(10).variables = {'namingERPdataPt10'};
             filelist(10).sessions = {1:4};
             filelist(10).sessiontag = 'tagall%02d';
+            %% Subjects 11 and 12 are lacking coordinates
+            % Subject 11
+            filelist(11).filename = 'namingERP_Pt11.mat';
+            filelist(11).variables = {'namingERP_data_PtSK_Pt11'};
+            filelist(11).sessions = {1:4};
+            filelist(11).sessiontag = 'tagss%02d';
+            % Subject 12
+            filelist(12).filename = 'namingERP_Pt12.mat';
+            filelist(12).variables = {'namingERP_data_PtTS_Pt12'};
+            filelist(12).sessions = {1:4};
+            filelist(12).sessiontag = 'nam_%02d';
         case 'ref'
         %     filelist_ref = {...
         %       'namingERP_Pt01_refD14.mat',{'namingERP_data_PtYK_Pt01_refD14'},{[1,2,3,4]},'tag_ss%02d_all';...
@@ -512,13 +526,13 @@ function setup_data(varargin)
 
         Hz = 1 / Pt.LFP.DIM(1).interval; % ticks per second
         boxcar_size  = (BoxCarSize / 1000) * Hz;
-        window_start = (WindowStartInMilliseconds / 1000) * Hz;
+%         window_start = (WindowStartInMilliseconds / 1000) * Hz;
         window_size  = ( WindowSizeInMilliseconds / 1000) * Hz; % in ticks (where a tick is a single time-step).
-        baseline_size  = ( BaselineSizeInMilliseconds / 1000) * Hz; % in ticks (where a tick is a single time-step).
+%         baseline_size  = ( BaselineSizeInMilliseconds / 1000) * Hz; % in ticks (where a tick is a single time-step).
 
         % Will return a session -by- electrode cell array, each containing a
         % trial -by- time matrix.
-        ECA = pull_trial_profiles(Pt.LFP, stim_order, [window_start, window_size], baseline_size, ecoord);
+        ECA = pull_trial_profiles(Pt.LFP, stim_order, [WindowStartInMilliseconds, WindowSizeInMilliseconds], BaselineSizeInMilliseconds, BoxCarSize, ecoord);
 %         ECA = arrangeElectrodeData(Pt.LFP.DATA, onsetIndex, [window_start, window_size]);
         % Average over sessions?
         if AverageOverSessions
@@ -537,6 +551,7 @@ function setup_data(varargin)
 
         % Boxcar Average time-points
         % ==========================
+        % THIS NOW HAPPENS WITHIN pull_trial_profiles
         % Algorithm :
         % 1. Trim the window so that it is evenly divisible by the boxcar.
         % 2. Transpose the data to make it time by item.
@@ -545,14 +560,14 @@ function setup_data(varargin)
         % 4. Take mean over first dimension (default of mean()).
         % 5. Squeeze out the now singleton first dimension
         % 6. Transpose back to item by time.
-        a = 1;
-        b = window_size - rem(window_size, boxcar_size);
-        c = b / boxcar_size;
-        for iElectrode = 1:numel(ECA)
-            x = ECA(iElectrode).data(:,a:b);
-            r = size(x, 1);
-            ECA(iElectrode).data = squeeze(mean(reshape(x',boxcar_size,c,r)))';
-        end
+%         a = 1;
+%         b = window_size - rem(window_size, boxcar_size);
+%         c = b / boxcar_size;
+%         for iElectrode = 1:numel(ECA)
+%             x = ECA(iElectrode).data(:,a:b);
+%             r = size(x, 1);
+%             ECA(iElectrode).data = squeeze(mean(reshape(x',boxcar_size,c,r)))';
+%         end
         
         % Compose a single matrix, where rows are items and columns are
         % time points nested within electrodes. This is done by simply
@@ -607,7 +622,7 @@ function setup_data(varargin)
         M.samplingrate = Hz;
         metadata = replacebyfield(metadata, M, 'subject', SUBJECTS(iSubject));
 
-        if exist(dpath_out,'file') && ~OVERWRITE;
+        if exist(dpath_out,'file') && ~OVERWRITE
             fprintf('Subject %d not written to disk, %s because output already exists.\n',SUBJECTS(iSubject),datacode)
         else
             save(dpath_out, 'X');
@@ -625,5 +640,26 @@ function setup_data(varargin)
         metapathout = fullfile(DATA_DIR_OUT,sprintf('metadata_%s.mat',datacode));
         fprintf('Metadata written to %s\n', metapathout);
         save(metapathout,'metadata');
+    end
+end
+
+function t = tabulate(x)
+    u = unique(x);
+    n = numel(u);
+    N = numel(x);
+    if iscell(u)
+        t = cell(n, 3);
+        t(:,1) = u;
+        for i = 1:n
+            t{i,2} = nnz(strcmp(u{i},x));
+            t{i,3} = t{i,2} ./ N;
+        end
+    else
+        t = zeros(n, 3);
+        t(:,1) = u;
+        for i = 1:n
+            t(i,2) = nnz(u(i) == x);
+        end
+        t(:,3) = t(:,2) ./ N;
     end
 end

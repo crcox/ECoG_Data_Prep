@@ -103,7 +103,7 @@ stimuli <- c(
     'windmill'
 )
 
-d.wide <- read.csv('D:/ECoG/KyotoNaming/Rick/allfeatures_allwords.csv', na.strings = '#N/A', stringsAsFactors = FALSE)
+d.wide <- read.csv('allfeatures_allwords.csv', na.strings = '#N/A', stringsAsFactors = FALSE)
 names(d.wide)[names(d.wide) == 'yo.yo'] <- 'yo-yo'
 names(d.wide)[names(d.wide) == 'raccoon'] <- 'racoon'
 names(d.wide)[names(d.wide) == 'aeroplane'] <- 'airplane'
@@ -117,6 +117,11 @@ z <- s %in% stimuli
 z <- c(T,T,z)
 d.wide <- d.wide[,z]
 d <- reshape2::melt(d.wide, c('type','feature'), variable.name = 'concept', value.name = 'hasfeature')
+head(d)
+d <- d %>%
+    group_by(feature) %>%
+    mutate(hasfeature = (hasfeature - mean(hasfeature))) %>%
+    ungroup()
 
 d$concept <- as.factor(d$concept)
 d$type <- as.factor(d$type)
@@ -129,11 +134,13 @@ for (i in 1:length(stimuli)) {
     s <- stimuli[i]
     M[,i] <- filter(d, concept == s)$hasfeature
 }
+z <- !apply(M,1,function(x) all(is.nan(x)))
+M <- M[z,]
 colnames(M) <- stimuli
 # Compute cosine similarity
 # cosine() calculates a similarity matrix between all **column vectors** of a matrix.
 D.cos <- as.dist(lsa::cosine(M))
-#write.csv(file = "C:/Users/mbmhscc4/MATLAB/ECOG/naming/data/targets/similarity/semantic/Dilkinea/cosine.csv", x=D.cos)
+write.csv(file = "../cosine.csv", x=lsa::cosine(M))
 #write.csv(file = "C:/Users/mbmhscc4/MATLAB/ECOG/naming/data/targets/similarity/semantic/Dilkinea/labels.csv", x=stimuli)
 sqrt_truncate_r <- function(S, tau) {
 # @S: n x n Similarity matrix
