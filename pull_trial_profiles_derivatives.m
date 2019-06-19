@@ -1,4 +1,4 @@
-function [ E ] = pull_trial_profiles(EEG, TrialInfo, window, baseline, varargin)
+function [ E ] = pull_trial_profiles_derivatives(EEG, TrialInfo, window, baseline, varargin)
 % PULL_TRIAL_PROFILES Returns a structure with a field for each electrode.
 %
 % Input:
@@ -32,26 +32,24 @@ function [ E ] = pull_trial_profiles(EEG, TrialInfo, window, baseline, varargin)
 %  array. Trials are ordered by stimulus index, not order of presentation
 %  (so trial 1 in each session can be interpretted as the same stimulus.)
 %
-% Chris Cox 19 March 2019
+% Chris Cox 25 March 2018
 
     p = inputParser();
     addRequired(p, 'EEG', @isstruct);
     addRequired(p, 'TrialInfo', @istable);
     addRequired(p, 'window', @isvector);
-    addRequired(p, 'baseline', @isscalar);
-    addOptional(p, 'boxcar', 0, @isscalar);
+    addOptional(p, 'target_resolution', 0, @isscalar);
+    addOptional(p, 'slope_interval', 0, @isscalar);
     addOptional(p, 'electrodes', cellstr(EEG.DIM(2).label), @iscellstr);
-    addParameter(p, 'ReturnBaseline', false, @islogical);
     parse(p, EEG, TrialInfo, window, baseline, varargin{:});
     
     % All times are supplied in ms and converted to ticks.
     Hz = 1 / EEG.DIM(1).interval; % ticks per second
-    boxcar_size   = (p.Results.boxcar / 1000) * Hz;
+    target_resolution   = (p.Results.target_resolution / 1000) * Hz;
+    slope_interval   = (p.Results.slope_interval / 1000) * Hz;
     window_start  = (window(1) / 1000) * Hz;
     window_size   = (window(2) / 1000) * Hz; % in ticks (where a tick is a single time-step).
-    baseline_size = (baseline  / 1000) * Hz; % in ticks (where a tick is a single time-step).
     
-    ReturnBaseline = p.Results.ReturnBaseline;
     Electrodes = p.Results.electrodes;
     
     allelectrodes = cellstr(EEG.DIM(2).label);
@@ -62,9 +60,14 @@ function [ E ] = pull_trial_profiles(EEG, TrialInfo, window, baseline, varargin)
         if ~any(currentElectrodeFilter)
             continue;
         end
-        X = zeros(4, max(TrialInfo.Trial), window_size);
-        B = zeros(4, max(TrialInfo.Trial), baseline_size);
-        B_raw = zeros(4, max(TrialInfo.Trial), baseline_size);
+        p = 0;
+        q = 0;
+        if slope_interval > 0
+            p = slope_interval - target_resolution;
+            p = p + mod(p,2);
+            q = p / 2;
+        end
+        X = zeros(4, max(TrialInfo.Trial), window_size + p);
         for i = 1:numel(sessions)
             session = sessions(i);
             z = TrialInfo.Session == session;
@@ -73,54 +76,65 @@ function [ E ] = pull_trial_profiles(EEG, TrialInfo, window, baseline, varargin)
                 z = SessionInfo.Trial == j;
                 onset = SessionInfo.OnsetIndex(z);
                 stimid = SessionInfo.ItemIndex(z);
-                if baseline > 0
-                    a = onset - baseline_size;
-                    b = onset - 1;
-                    baseline_mean = mean(EEG.DATA(a:b,currentElectrodeFilter));
-                    B(session,stimid,:) = EEG.DATA(a:b,currentElectrodeFilter) - baseline_mean;
-                    B_raw(session,stimid,:) = EEG.DATA(a:b,currentElectrodeFilter);
-                else
-                    baseline_mean = 0;
-                end
                 a = onset + window_start;
                 b = (a + window_size) - 1;
-                X(session,stimid,:) = EEG.DATA(a:b,currentElectrodeFilter) - baseline_mean;
+                a = a - q;
+                b = b + q;
+                X(session,stimid,:) = EEG.DATA(a:b,currentElectrodeFilter);
             end
         end
-        E(k).data = boxcar_average_timepoints(X, boxcar_size);
-        if ReturnBaseline
-            E(k).data = boxcar_average_timepoints(B, boxcar_size);
-            E(k).data = boxcar_average_timepoints(B_raw, boxcar_size);
+        E(k).data = derivative_of_timepoints(X, target_resolution, slope_interval, p);
+    end
+end
+
+function Xdv = derivative_of_timepoints(X, target_resolution, slope_interval, p)
+% BOXCAR_AVERAGE_TIMEPOINTS Downsample without convolution
+
+    if slope_interval == 0
+        Xdv = X;
+    else
+        q = p / 2;
+        [nsessions, nitems, window_size_p] = size(X);
+        window_size = window_size_p - p;
+        a = 1;
+        b = window_size - rem(window_size, target_resolution);
+        c = b / target_resolution;
+        Xdv = nan(nsessions, nitems, c);
+        % Columns of M correspond to windows of time that the slope will be
+        % computed over. The temporal resolution of the results will be
+        % equal to the number of columns in M, which will be c.
+        offset = target_resolution .* 0:(c-1); %#ok<BDSCA>
+        offset = offset + floor(target_resolution / 2);
+        tmp = (1:slope_interval) - floor(slope_interval/2);
+        M = bsxfun(@plus, tmp', offset) + q;
+        if c < window_size
+            for i = 1:nsessions
+                % Time by Item after transpose
+                x = squeeze(X(i,:,a:(b+q)))';
+                % Number of items
+                r = size(x, 2);
+                for j = 1:r
+                    yy = reshape(x(M,j), size(M));
+                    xx = 1:slope_interval;
+                    Xdv(i,j,:) = best_fit_slope(yy,xx);
+                end
+            end
+        else
+            Xdv = X;
         end
     end
 end
 
-function Xbc = boxcar_average_timepoints(X, boxcar_size)
-% BOXCAR_AVERAGE_TIMEPOINTS Downsample without convolution
-% 
-% Algorithm :
-% 1. Trim the window so that it is evenly divisible by the boxcar.
-% 2. Transpose the data to make it time by item.
-% 3. Reshape to be boxcar_size by adj_window_size / boxcar_size by item.
-% 4. Take mean over first dimension (default of mean()).
-% 5. Squeeze out the now singleton first dimension
-% 6. Transpose back to item by time.
-    if boxcar_size == 0
-        Xbc = X;
-    else
-        [nsessions, nitems, window_size] = size(X);
-        a = 1;
-        b = window_size - rem(window_size, boxcar_size);
-        c = b / boxcar_size;
-        Xbc = nan(nsessions, nitems, c);
-        if c < window_size
-            for i = 1:nsessions
-                x = squeeze(X(i,:,a:b));
-                r = size(x, 1);
-                Xbc(i,:,:) = squeeze(mean(reshape(x',boxcar_size,c,r),1))';
-            end
-        else
-            Xbc = X;
-        end
+function [m] = best_fit_slope(y, x)
+% BEST_FIT_slope Least-squares estimate of best fit slope.
+    if nargin < 2
+        x = linspace(-0.5,0.5,size(y,1));
     end
+    x = (x - mean(x)) / 100;
+    ym = mean(y);
+    yc = bsxfun(@minus, y, ym);
+    m = sum(bsxfun(@times, yc, x(:))) ./ sum(x .^ 2);
+    % The intercept, which we intentionally do not return, is:
+%     b = ym;
 end
+    

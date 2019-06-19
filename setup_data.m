@@ -1,132 +1,50 @@
 function setup_data(varargin)
-% DEPENDENCIES
-% 1. glmnet
-% 2. sqrt_truncate_r.m (from WholeBrain_RSA/src)
-    if nargin == 1
-        % If there is only one argument, treat it as a path to a parameter
-        % file, or a path to a directory that contains a file named
-        % 'params.json'.
-        [p,f,e] = fileparts(varargin{1});
-        if strcmp('.json', e)
-            jsonpath = varargin{1};
-        elseif isempty(e)
-            jsonpath = fullfile(p,f,'params.json');
-        else
-            warning('Expected a json file. %s does not have a conventional file extension for a json file (.json).');
-            jsonpath = varargin{1};
-        end
-    elseif nargin == 0
-        % If there are no arguments, look for a parameter file in the
-        % current directory.
+    % - If there are no arguments, assume parameter file in the current
+    %   directory.
+    % - If more than 1 parameter is provided, then assume that all
+    %   arguments are provided at the command line and parse as such.
+    if nargin == 0
         jsonpath = './params.json';
-    else
-        % If more than 1 parameter is provided, then assume that all
-        % arguments are provided at the command line and parse as such.
+    elseif nargin == 1
+        jsonpath = compose_json_path(varargin{1});
+    elseif nargin > 1
         jsonpath = [];
     end
-
-    % If nargin < 2, jsonpath will be set to something. It may not be a
-    % valid file, so 'jsonload()' may result in a fatal error.
-    if isempty(jsonpath)
-        isjsoncfg = false;
-    else
+    % - If nargin < 2, jsonpath will be set to something. It may not be a
+    %   valid file, so 'jsonload()' may result in a fatal error.
+    % - Input read from a json file will be represented as a
+    %   structure. The inputParser cannot handle this structure, and
+    %   so we need to get the structure into an amenable format.
+    isjsoncfg = ~isempty(jsonpath);
+    if isjsoncfg
         jdat = loadjson(jsonpath);
-        isjsoncfg = true;
+        varargin = [fieldnames(jdat); struct2cell(jdat)];
     end
-
-    % Input is handled differently depending on how it is input and whether
-    % the program is being run from a Unix/Windows terminal or within
-    % Matlab propper. isdeployed() checks whether the program is being run
-    % after compilation with mcc.
-    p = inputParser();
+    % - Input may also come from the Matlab command line/script or the
+    %   shell/Windows command line.
+    % - Input is handled differently depending on how it is input and
+    %   whether the program is being run from a shell/Windows terminal or
+    %   within Matlab propper. isdeployed() checks whether the program is 
+    %   being run after compilation with mcc.
+    %
+    % IMPORTANT NOTE:
+    % When slopewindow is greater than 0, the data returned is not an
+    % average LFP, but rather the slope associated with the best fit line
+    % to the data within a window od specified size.
     if isdeployed && ~isjsoncfg
-        % In this case, all arguments must be handled as strings, since
-        % they will be passed directly from the Unix/Windows terminal.
-        addParameter(p, 'onset',[]);
-        addParameter(p, 'duration',[]);
-        addParameter(p, 'baseline','0');
-        addParameter(p, 'subjects', '1 2 3 5 7 8 9 10', @ischar);
-        addParameter(p, 'boxcar', '0', @ischar);
-        addParameter(p, 'average', '1', @ischar);
-        addParameter(p, 'datacode', 'raw', @ischar);
-        addParameter(p, 'dataroot', '/mnt/sw01-home01/mbmhscc4/scratch/data/Naming_ECoG');
-        addParameter(p, 'metaroot', '/mnt/sw01-home01/mbmhscc4/scratch/data/Naming_ECoG/meta');
-        addParameter(p, 'datarootout', []);
-        addParameter(p, 'cvpath', []);
-        addParameter(p, 'overwrite', '0');
-        addParameter(p, 'WriteIndividualMetadata', '0');
-        parse(p, varargin{:});
-        if isempty(p.Results.onset)
-            error('A window onset time must be provided.');
-        end
-        if isempty(p.Results.duration)
-            error('A window duration must be provided.');
-        end
-        fprintf('        Window onset (ms): %s\n', p.Results.onset);
-        fprintf('     Window duration (ms): %s\n', p.Results.duration);
-        fprintf('                 subjects: %s\n', p.Results.subjects);
-        fprintf('              Boxcar Size: %s\n', p.Results.boxcar);
-        fprintf('    Average over sessions: %s\n', p.Results.average);
-        fprintf('    Data root (for input): %s\n', p.Results.dataroot);
-        fprintf('    Meta root (for input): %s\n', p.Results.metaroot);
-        fprintf('  Overwrite existing data: %s\n', p.Results.overwrite);
-        fprintf('Write individual metadata: %s\n', p.Results.WriteIndividualMetadata);
-
-        %% Setup
-        WindowStartInMilliseconds = str2double(p.Results.onset);
-        WindowSizeInMilliseconds = str2double(p.Results.duration);
-        BaselineSizeInMilliseconds = str2double(p.Results.baseline);
-        BoxCarSize = str2double(p.Results.boxcar);
-        AverageOverSessions = str2double(p.Results.average);
-        OVERWRITE = str2double(p.Results.overwrite);
-        WriteIndividualMetadata = str2double(p.Results.WriteIndividualMetadata);
-        clean_string = regexprep(p.Results.subjects, ',? *', ' ');
-        SUBJECTS = str2double(strsplit(clean_string));
+        p = parse_from_terminal(varargin{:});
     else
-        % In this case, arguments can be handled in their expected types
-        % (numbers as numbers, etc). The input may be coming directly from
-        % the Matlab command line or script, or parsed from a json file.
-        addParameter(p, 'onset',[]);
-        addParameter(p, 'duration',[]);
-        addParameter(p, 'baseline',0);
-        addParameter(p, 'subjects', [1:3,5,7:10], @isnumeric);
-        addParameter(p, 'boxcar', 0);
-        addParameter(p, 'average', 1);
-        addParameter(p, 'datacode', 'raw', @ischar);
-        addParameter(p, 'dataroot', 'D:\ECoG\KyotoNaming\data');
-        addParameter(p, 'metaroot', 'C:\Users\mbmhscc4\MATLAB\ECOG\naming\data');
-        addParameter(p, 'datarootout', []);
-        addParameter(p, 'cvpath', []);
-        addParameter(p, 'overwrite', 0);
-        addParameter(p, 'WriteIndividualMetadata', 0);
-
-        if isjsoncfg
-            % Input read from a json file will be represented as a
-            % structure. The inputParser cannot handle this structure, and
-            % so we need to get the structure into an amenable format.
-            varargin = [fieldnames(jdat); struct2cell(jdat)];
-        end
-        parse(p, varargin{:});
-        fprintf('        Window onset (ms): %d\n', p.Results.onset);
-        fprintf('     Window duration (ms): %d\n', p.Results.duration);
-        fprintf('                 subjects: %s\n', strjoin(strsplit(num2str(p.Results.subjects)), ', '));
-        fprintf('              Boxcar Size: %d\n', p.Results.boxcar);
-        fprintf('    Average over sessions: %d\n', p.Results.average);
-        fprintf('    Data root (for input): %s\n', p.Results.dataroot);
-        fprintf('    Meta root (for input): %s\n', p.Results.metaroot);
-        fprintf('  Overwrite existing data: %d\n', p.Results.overwrite);
-        fprintf('Write individual metadata: %d\n', p.Results.WriteIndividualMetadata);
-
-        %% Setup
-        WindowStartInMilliseconds = p.Results.onset;
-        WindowSizeInMilliseconds = p.Results.duration;
-        BaselineSizeInMilliseconds = p.Results.baseline;
-        BoxCarSize = p.Results.boxcar;
-        AverageOverSessions = p.Results.average;
-        OVERWRITE = p.Results.overwrite;
-        WriteIndividualMetadata = p.Results.WriteIndividualMetadata;
-        SUBJECTS = p.Results.subjects;
+        p = parse_from_matlab_or_json(varargin{:});
     end
+    WindowStartInMilliseconds = p.Results.WindowStart;
+    WindowSizeInMilliseconds = p.Results.WindowSize;
+    BaselineSizeInMilliseconds = p.Results.BaselineWindow;
+    BoxCarSize = p.Results.boxcar;
+    SlopeInterval = p.Results.slope_interval;
+    AverageOverSessions = p.Results.average;
+    OVERWRITE = p.Results.overwrite;
+    WriteIndividualMetadata = p.Results.WriteIndividualMetadata;
+    SUBJECTS = p.Results.subjects;
     DATA_DIR = p.Results.dataroot;
     if isempty(p.Results.datarootout)
         DATA_ROOT_OUT = DATA_DIR;
@@ -139,10 +57,10 @@ function setup_data(varargin)
     COORD_DIR = fullfile(META_DIR,'coords');
     SIM_DIR = fullfile(META_DIR,'similarity');
     TARGET_DIR = fullfile(META_DIR,'targets');
-    CV_DIR = fullfile(META_DIR,'cv');
-    cvpath = p.Results.cvpath;
-    datacode = p.Results.datacode;
-
+%     CV_DIR = fullfile(META_DIR,'cv');
+    CVPATH = p.Results.cvpath;
+    DATACODE = p.Results.datacode;
+    Pt = p.Results.Pt;
 
     %% Define Output directory
     if AverageOverSessions == 1
@@ -157,7 +75,6 @@ function setup_data(varargin)
         'WindowStart',sprintf('%04d',WindowStartInMilliseconds),...
         'WindowSize',sprintf('%04d',WindowSizeInMilliseconds)...
     );
-
     if ~exist(DATA_DIR_OUT,'dir')
         mkdir(DATA_DIR_OUT)
     end
@@ -194,7 +111,7 @@ function setup_data(varargin)
 %     stim_key = textscan(fid,'%d %s','Delimiter',',');
 %     fclose(fid);
 
-    nitems = numel(stim_key.Stimulus);
+%     nitems = numel(stim_key.Stimulus);
     nsessions = numel(unique(stim_order.Session));
 
     %% Ensure stimulus labels are sorted by their index
@@ -230,100 +147,18 @@ function setup_data(varargin)
       'samplingrate',[],...
       'AverageOverSessions',[],...
       'BoxCarSize',[],...
+      'SlopeInterval',[],...
       'BaselineSize',[],...
       'WindowStartInMilliseconds',[],...
       'WindowSizeInMilliseconds',[]...
     );
 
     % TARGETS
-    t_type_fmt = {'category','embedding','similarity'};
-    n_tf = numel(t_type_fmt);
-    for i_tf = 1:n_tf
-        type_fmt = t_type_fmt{i_tf};
-        switch type_fmt
-            case 'category'
-                t_type_categories = list_files(fullfile(TARGET_DIR,type_fmt));
-                n_c = numel(t_type_categories);
-                for i_c = 1:n_c
-                    category_file = fullfile(TARGET_DIR,type_fmt,t_type_categories{i_c});
-                    category_label = strip_extension(t_type_categories{i_c});
-                    fid = fopen(category_file);
-                    tmp = textscan(fid, '%s %u8','Delimiter',',');
-                    category_labels = tmp{1};
-                    category_targets = tmp{2};
-                    fclose(fid);
-                    metadata = installCategoryStructure(metadata, category_targets, category_labels, category_label, []);
-                end
-            case {'embedding','similarity'}
-                t_type_sims = list_dirs(fullfile(TARGET_DIR,type_fmt));
-                n_ts = numel(t_type_sims);
-                for i_ts = 1:n_ts
-                    type_sim = t_type_sims{i_ts};
-                    t_sim_sources = list_dirs(fullfile(TARGET_DIR,type_fmt,type_sim));
-                    n_s = numel(t_sim_sources);
-                    for i_s = 1:n_s
-                        source = t_sim_sources{i_s};
-                        t_source_metrics = list_files(fullfile(TARGET_DIR,type_fmt,type_sim,source));
-                        t_source_metrics = t_source_metrics(~strcmp('labels.txt',t_source_metrics));
-                        n_m = numel(t_source_metrics);
-                        for i_m = 1:n_m
-                            metric_file = t_source_metrics{i_m};
-                            metric_label = strip_extension(metric_file);
-                            structure_file = fullfile(TARGET_DIR,type_fmt,type_sim,source,metric_file);
-                            structure_label_file = fullfile(TARGET_DIR,type_fmt,type_sim,source,'labels.txt');
-                            structure_matrix = csvread(structure_file);
-                            fid = fopen(structure_label_file);
-                            tmp = textscan(fid, '%s');
-                            structure_labels = tmp{1};
-                            fclose(fid);
-                            metadata = installSimilarityStructure(metadata, structure_matrix, structure_labels, type_sim, source, metric_label, type_fmt);
-                        end
-                    end
-                end
-        end
-    end
-
-	animate = [ones(50,1);zeros(50,1)];
-%    TARGETS = struct(...
-%        'label', {'animate','semantic','semantic'},...
-%        'type', {'category','similarity','embedding'},...
-%        'sim_source',{[],'NEXT','NEXT'},...
-%        'sim_metric',{[],'correlation','euclidean'},...
-%        'target',{animate,S,embedding}...
-%    );
-%     if AverageOverSessions == 0;
-%         for iTarget = 1:numel(TARGETS)
-%             switch lower(TARGETS(iTarget).type)
-%             case {'category','embedding'}
-%                 TARGETS(iTarget).target = repmat(TARGETS(iTarget).target,nsessions,1);
-%             case 'similarity'
-%                 TARGETS(iTarget).target = repmat(TARGETS(iTarget).target,nsessions,nsessions);
-%             end
-%             SCHEMES = repmat(SCHEMES,nsessions,1);
-%         end
-%     end
+    % - Target data is read from TARGET_DIR
+    metadata = install_targets_in_metadata(metadata,TARGET_DIR);
 
     % CV
-    if isempty(cvpath)
-        nschemes = 10;
-        nfolds = 10;
-        SCHEMES = zeros(nitems, nschemes);
-        for iScheme = 1:nschemes
-            c = cvpartition(animate,'KFold', nfolds);
-            for iFold = 1:nfolds
-                SCHEMES(:,iScheme) = SCHEMES(:,iScheme) + (test(c, iFold) * iFold);
-            end
-        end
-    else
-        if exist(cvpath, 'file')
-            load(cvpath, 'CV');
-        else
-            cvfile = cvpath;
-            cvpath = fullfile(CV_DIR, cvfile);
-            load(cvpath, 'CV');
-        end
-        SCHEMES = CV;
-    end
+    SCHEMES = compose_cv_scemes(CVPATH);
 
     %% Define metadata
     NSUBJ = numel(SUBJECTS);
@@ -343,6 +178,7 @@ function setup_data(varargin)
         end
         M.AverageOverSessions = AverageOverSessions;
         M.BoxCarSize = BoxCarSize;
+        M.SlopeInterval = SlopeInterval;
         M.BaselineSize = BaselineSizeInMilliseconds;
         M.WindowStartInMilliseconds = WindowStartInMilliseconds;
         M.WindowSizeInMilliseconds = WindowSizeInMilliseconds;
@@ -359,7 +195,7 @@ function setup_data(varargin)
     % following structures explicitly represent all the file and field names that
     % need to be referenced.
     filelist = struct('subject',num2cell(1:12), 'filename',[], 'variables', [], 'sessions', [], 'sessiontag', []);
-    switch datacode
+    switch DATACODE
         % This bit is necessary because the raw data were not stored with a
         % consistent naming convention.
         case 'raw'
@@ -413,7 +249,7 @@ function setup_data(varargin)
             filelist(10).variables = {'namingERPdataPt10'};
             filelist(10).sessions = {1:4};
             filelist(10).sessiontag = 'tagall%02d';
-            %% Subjects 11 and 12 are lacking coordinates
+            % --- Subjects 11 and 12 are lacking coordinates ---
             % Subject 11
             filelist(11).filename = 'namingERP_Pt11.mat';
             filelist(11).variables = {'namingERP_data_PtSK_Pt11'};
@@ -443,15 +279,17 @@ function setup_data(varargin)
         sdir = sprintf('Pt%02d',SUBJECTS(iSubject));
         F = selectbyfield(filelist, 'subject', SUBJECTS(iSubject));
         if any(cellfun('isempty', struct2cell(F)))
-            fprintf('Skipping subject %d, %s because of missing data.\n',SUBJECTS(iSubject),datacode);
+            fprintf('Skipping subject %d, %s because of missing data.\n',SUBJECTS(iSubject),DATACODE);
             continue
         else
-            fprintf('Beginning subject %d, %s.\n',SUBJECTS(iSubject),datacode);
+            fprintf('Beginning subject %d, %s.\n',SUBJECTS(iSubject),DATACODE);
         end
-        dpath_out = fullfile(DATA_DIR_OUT, sprintf('s%02d_%s.mat',SUBJECTS(iSubject),datacode));
-        spath = fullfile(DATA_DIR,datacode,sdir,F.filename);
+        dpath_out = fullfile(DATA_DIR_OUT, sprintf('s%02d_%s.mat',SUBJECTS(iSubject),DATACODE));
+        spath = fullfile(DATA_DIR,DATACODE,sdir,F.filename);
         fprintf('Loading %s...\n', spath);
-        Pt = load(spath);
+        if isempty(Pt)
+            Pt = load(spath);
+        end
 
         nChunks = numel(F.variables);
         if nChunks > 1
@@ -525,14 +363,22 @@ function setup_data(varargin)
         end
 
         Hz = 1 / Pt.LFP.DIM(1).interval; % ticks per second
-        boxcar_size  = (BoxCarSize / 1000) * Hz;
-%         window_start = (WindowStartInMilliseconds / 1000) * Hz;
         window_size  = ( WindowSizeInMilliseconds / 1000) * Hz; % in ticks (where a tick is a single time-step).
-%         baseline_size  = ( BaselineSizeInMilliseconds / 1000) * Hz; % in ticks (where a tick is a single time-step).
 
         % Will return a session -by- electrode cell array, each containing a
         % trial -by- time matrix.
-        ECA = pull_trial_profiles(Pt.LFP, stim_order, [WindowStartInMilliseconds, WindowSizeInMilliseconds], BaselineSizeInMilliseconds, BoxCarSize, ecoord);
+        % NOTE: IF SLOPE INTERVAL IS 0, then each data points is the
+        % average LFP within a boxcar. If greater than zero, then each
+        % datapoint is the slope of the best fit line within that given
+        % interval. Each interval is centered on the middle of where the
+        % boxcar would have been.
+        disp([WindowStartInMilliseconds, WindowSizeInMilliseconds]);
+        if SlopeInterval > 0
+            TargetResolution = BoxCarSize;
+            ECA = pull_trial_profiles_derivatives(Pt.LFP, stim_order, [WindowStartInMilliseconds, WindowSizeInMilliseconds], TargetResolution, SlopeInterval, ecoord);
+        else
+            ECA = pull_trial_profiles(Pt.LFP, stim_order, [WindowStartInMilliseconds, WindowSizeInMilliseconds], BaselineSizeInMilliseconds, BoxCarSize, ecoord);
+        end
 %         ECA = arrangeElectrodeData(Pt.LFP.DATA, onsetIndex, [window_start, window_size]);
         % Average over sessions?
         if AverageOverSessions
@@ -549,52 +395,7 @@ function setup_data(varargin)
             end
         end
 
-        % Boxcar Average time-points
-        % ==========================
-        % THIS NOW HAPPENS WITHIN pull_trial_profiles
-        % Algorithm :
-        % 1. Trim the window so that it is evenly divisible by the boxcar.
-        % 2. Transpose the data to make it time by item.
-        % 3. Reshape to be boxcar_size by adj_window_size / boxcar_size by
-        % item.
-        % 4. Take mean over first dimension (default of mean()).
-        % 5. Squeeze out the now singleton first dimension
-        % 6. Transpose back to item by time.
-%         a = 1;
-%         b = window_size - rem(window_size, boxcar_size);
-%         c = b / boxcar_size;
-%         for iElectrode = 1:numel(ECA)
-%             x = ECA(iElectrode).data(:,a:b);
-%             r = size(x, 1);
-%             ECA(iElectrode).data = squeeze(mean(reshape(x',boxcar_size,c,r)))';
-%         end
-        
-        % Compose a single matrix, where rows are items and columns are
-        % time points nested within electrodes. This is done by simply
-        % concatenating the matrices associated with each electrode
-        % columnwise.
         X = cat(2, ECA.data);
-        
-        % This is the old approach... will be deleted soon.
-%         nElectrodes = size(ECA,2);
-%         for iElectrode = 1:nElectrodes
-%             for iSession = 1:4
-%                 ECA{iSession,iElectrode} = ECA{iSession,iElectrode}(stim_sort_ix{iSession},:);
-%                 if boxcar_size > 1
-%                     ECA{iSession,iElectrode} = boxcarmean(ECA{iSession,iElectrode},boxcar_size,'KeepPartial',0);
-%                 end
-%             end
-%             % Average Sessions
-%             if AverageOverSessions
-%                 tmp = cat(3,ECA{:,iElectrode});
-%                 ECA{1,iElectrode} = mean(tmp,3);
-%             end
-%         end
-%         if AverageOverSessions
-%             ECA(2:end,:) = [];
-%         end
-%         X = cell2mat(ECA);
-
         [~,reduxFilter] = removeOutliers(X);
         y = COORDS.xyz(:,2);
         m = median(y);
@@ -604,17 +405,17 @@ function setup_data(varargin)
         M = registerFilter(M, 'colfilter', 2, reduxFilter.voxels);
         M = registerFilter(M, 'anterior',  2, y > m);
         M = registerFilter(M, 'posterior', 2, y <= m);
-        tmp = load(fullfile(FILTER_DIR,'DilkineaSplit','filter.mat'),'filter');
+        tmp = load(fullfile(FILTER_DIR,'DilkinaSplit','filter.mat'),'filter');
         if AverageOverSessions
             M = registerFilter(M, 'animate', 1, [true(50,1);false(50,1)]);
             M = registerFilter(M, 'inanimate', 1, [false(50,1);true(50,1)]);
-            M = registerFilter(M, 'DilkineaSplit1', 1, tmp.filter == 0);
-            M = registerFilter(M, 'DilkineaSplit2', 1, tmp.filter == 1);
+            M = registerFilter(M, 'DilkinaSplit1', 1, tmp.filter == 0);
+            M = registerFilter(M, 'DilkinaSplit2', 1, tmp.filter == 1);
         else
             M = registerFilter(M, 'animate', 1, repmat([true(50,1);false(50,1)],nsessions,1));
             M = registerFilter(M, 'inanimate', 1, repmat([false(50,1);true(50,1)],nsessions,1));
-            M = registerFilter(M, 'DilkineaSplit1', 1, repmat(tmp.filter,nsessions,1) == 0);
-            M = registerFilter(M, 'DilkineaSplit2', 1, repmat(tmp.filter,nsessions,1) == 1);
+            M = registerFilter(M, 'DilkinaSplit1', 1, repmat(tmp.filter,nsessions,1) == 0);
+            M = registerFilter(M, 'DilkinaSplit2', 1, repmat(tmp.filter,nsessions,1) == 1);
         end
 
         M.coords = COORDS;
@@ -623,13 +424,13 @@ function setup_data(varargin)
         metadata = replacebyfield(metadata, M, 'subject', SUBJECTS(iSubject));
 
         if exist(dpath_out,'file') && ~OVERWRITE
-            fprintf('Subject %d not written to disk, %s because output already exists.\n',SUBJECTS(iSubject),datacode)
+            fprintf('Subject %d not written to disk, %s because output already exists.\n',SUBJECTS(iSubject),DATACODE)
         else
             save(dpath_out, 'X');
             fprintf('Subject written to %s\n', dpath_out);
             if WriteIndividualMetadata
                 OneSubject.metadata = M;
-                metapathout = fullfile(DATA_DIR_OUT,sprintf('metadata_%s_%02d.mat',datacode,SUBJECTS(iSubject)));
+                metapathout = fullfile(DATA_DIR_OUT,sprintf('metadata_%s_%02d.mat',DATACODE,SUBJECTS(iSubject)));
                 save(metapathout, '-struct', OneSubject);
                 fprintf('Metadata written to %s\n', metapathout);
             end
@@ -637,7 +438,7 @@ function setup_data(varargin)
     end
     %% Save metadata
     if ~WriteIndividualMetadata
-        metapathout = fullfile(DATA_DIR_OUT,sprintf('metadata_%s.mat',datacode));
+        metapathout = fullfile(DATA_DIR_OUT,sprintf('metadata_%s.mat',DATACODE));
         fprintf('Metadata written to %s\n', metapathout);
         save(metapathout,'metadata');
     end
@@ -662,4 +463,85 @@ function t = tabulate(x)
         end
         t(:,3) = t(:,2) ./ N;
     end
+end
+
+function jsonpath = compose_json_path(x)
+    % If there is only one argument, treat it as a path to a parameter
+    % file, or a path to a directory that contains a file named
+    % 'params.json'.
+    [p,f,e] = fileparts(x);
+    if strcmp('.json', e)
+        jsonpath = x;
+    elseif isempty(e)
+        jsonpath = fullfile(p,f,'params.json');
+    else
+        warning('Expected a json file. %s does not have a conventional file extension for a json file (.json).');
+        jsonpath = x;
+    end
+end
+
+function p = parse_from_matlab_or_json(varargin)
+    % In this case, arguments can be handled in their expected types
+    % (numbers as numbers, etc). The input may be coming directly from
+    % the Matlab command line or script, or parsed from a json file.
+    p = inputParser();
+    addParameter(p, 'WindowStart',[]);
+    addParameter(p, 'WindowSize',[]);
+    addParameter(p, 'BaselineWindow',0);
+    addParameter(p, 'subjects', [1:3,5,7:10], @isnumeric);
+    addParameter(p, 'boxcar', 10, @isscalar);
+    addParameter(p, 'slope_interval', 0, @isscalar);
+    addParameter(p, 'average', 1);
+    addParameter(p, 'datacode', 'raw', @ischar);
+    addParameter(p, 'dataroot', 'D:\ECoG\KyotoNaming\data');
+    addParameter(p, 'metaroot', 'C:\Users\mbmhscc4\MATLAB\ECOG\naming\data');
+    addParameter(p, 'datarootout', []);
+    addParameter(p, 'cvpath', []);
+    addParameter(p, 'overwrite', 0);
+    addParameter(p, 'WriteIndividualMetadata', 0);
+    addParameter(p, 'Pt', []);
+    parse(p, varargin{:});
+    if isempty(p.Results.WindowStart)
+        error('A window start time must be provided.');
+    end
+    if isempty(p.Results.WindowSize)
+        error('A window size must be provided.');
+    end 
+end
+
+function p = parse_from_terminal(varargin)
+    % In this case, all arguments must be handled as strings, since
+    % they will be passed directly from the Unix/Windows terminal.
+    p = inputParser();
+    addParameter(p, 'WindowStart',[]);
+    addParameter(p, 'WindowSize',[]);
+    addParameter(p, 'BaselineWindow','0');
+    addParameter(p, 'subjects', '1 2 3 5 7 8 9 10', @ischar);
+    addParameter(p, 'boxcar', '10', @ischar);
+    addParameter(p, 'slope_interval', '0', @ischar);
+    addParameter(p, 'average', '1', @ischar);
+    addParameter(p, 'datacode', 'raw', @ischar);
+    addParameter(p, 'dataroot', '/mnt/sw01-home01/mbmhscc4/scratch/data/Naming_ECoG');
+    addParameter(p, 'metaroot', '/mnt/sw01-home01/mbmhscc4/scratch/data/Naming_ECoG/meta');
+    addParameter(p, 'datarootout', []);
+    addParameter(p, 'cvpath', []);
+    addParameter(p, 'overwrite', '0');
+    addParameter(p, 'WriteIndividualMetadata', '0');
+    addParameter(p, 'Pt', []);
+    parse(p, varargin{:});
+    if isempty(p.Results.onset)
+        error('A window start time must be provided.');
+    end
+    if isempty(p.Results.duration)
+        error('A window size must be provided.');
+    end
+    p.Results.WindowStart = str2double(p.Results.WindowStart);
+    p.Results.WindowSize = str2double(p.Results.WindowSize);
+    p.Results.BaselineWindow = str2double(p.Results.BaselineWindow);
+    p.Results.boxcar = str2double(p.Results.boxcar);
+    p.Results.average = str2double(p.Results.average);
+    p.Results.overwrite = str2double(p.Results.overwrite);
+    p.Results.WriteIndividualMetadata = str2double(p.Results.WriteIndividualMetadata);
+    clean_string = regexprep(p.Results.subjects, ',? *', ' ');
+    p.Results.subjects = str2double(strsplit(clean_string));
 end
