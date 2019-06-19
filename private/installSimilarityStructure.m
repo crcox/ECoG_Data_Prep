@@ -4,7 +4,7 @@ function metadata = installSimilarityStructure(metadata, simmat, simlabels, labe
   if m == n
     if all(diag(simmat) == 1)
       type = 'similarity';
-    elseif all(diag(simmat) == 0);
+    elseif all(diag(simmat) == 0)
       error('simmat is a distance matrix! A symmetric similarity matrix is required.')
     else
       error('simmat is not symmetric! A symmetric similarity matrix is required.')

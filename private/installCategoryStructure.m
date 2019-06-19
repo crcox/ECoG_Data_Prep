@@ -82,7 +82,7 @@ function metadata = installCategoryStructure(metadata, catmat, stimlabels, label
   nkey = numel(key);
   tmp = reshape([key;val], nkey*2, 1);
   for i = 1:numel(metadata)
-    if numel(fieldnames(metadata(i).targets)) > 0;
+    if numel(fieldnames(metadata(i).targets)) > 0
       ntargets = numel(metadata(i).targets);
       z = false(ntargets, nkey);
       for j = 1:nkey
@@ -107,7 +107,7 @@ function metadata = installCategoryStructure(metadata, catmat, stimlabels, label
     nkey = numel(key);
     tmp = reshape([key;val], nkey*2, 1);
     for i = 1:numel(metadata)
-      if numel(fieldnames(metadata(i).filters)) > 0;
+      if numel(fieldnames(metadata(i).filters)) > 0
         nfilters = numel(metadata(i).filters);
         z = false(nfilters, nkey);
         for j = 1:nkey
