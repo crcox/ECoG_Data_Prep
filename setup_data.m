@@ -60,7 +60,7 @@ function setup_data(varargin)
 %     CV_DIR = fullfile(META_DIR,'cv');
     CVPATH = p.Results.cvpath;
     DATACODE = p.Results.datacode;
-    Pt = p.Results.Pt;
+    Pt_all = p.Results.Pt;
 
     %% Define Output directory
     if AverageOverSessions == 1
@@ -286,9 +286,14 @@ function setup_data(varargin)
         end
         dpath_out = fullfile(DATA_DIR_OUT, sprintf('s%02d_%s.mat',SUBJECTS(iSubject),DATACODE));
         spath = fullfile(DATA_DIR,DATACODE,sdir,F.filename);
-        fprintf('Loading %s...\n', spath);
-        if isempty(Pt)
+        if isempty(Pt_all)
+            fprintf('Loading %s...\n', spath);
             Pt = load(spath);
+        elseif length(Pt_all) == NSUBJ
+            fprintf('Referencing the data from %s as subject %d...\n', spath, iSubject);
+            Pt = Pt_all(iSubject);
+        else
+            error('If providing particpant data, the subjects and Pt arguments must have the same length.');
         end
 
         nChunks = numel(F.variables);
