@@ -290,7 +290,7 @@ function setup_data(varargin)
             fprintf('Loading %s...\n', spath);
             Pt = load(spath);
         elseif length(Pt_all) == NSUBJ
-            fprintf('Referencing the data from %s as subject %d...\n', spath, iSubject);
+            fprintf('Referencing the data from %s as subject %d...\n', spath, SUBJECTS(iSubject));
             Pt = Pt_all(iSubject);
         else
             error('If providing particpant data, the subjects and Pt arguments must have the same length.');
