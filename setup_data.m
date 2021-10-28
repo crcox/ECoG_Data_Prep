@@ -368,7 +368,6 @@ function setup_data(varargin)
         end
 
         Hz = 1 / Pt.LFP.DIM(1).interval; % ticks per second
-        window_size  = ( WindowSizeInMilliseconds / 1000) * Hz; % in ticks (where a tick is a single time-step).
 
         % Will return a session -by- electrode cell array, each containing a
         % trial -by- time matrix.
@@ -396,7 +395,8 @@ function setup_data(varargin)
             % permute will make items the first dimension, and the reshape
             % will then block rows by session
             for iElectrode = 1:numel(ECA)
-                ECA(iElectrode).data = reshape((permute(ECA(iElectrode).data,[2,1,3])), [], window_size);
+                ntp_boxcar = size(ECA(iElectrode).data, 3);
+                ECA(iElectrode).data = reshape((permute(ECA(iElectrode).data,[2,1,3])), [], ntp_boxcar);
             end
         end
 
