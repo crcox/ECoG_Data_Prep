@@ -18,8 +18,10 @@ function setup_data(varargin)
     isjsoncfg = ~isempty(jsonpath);
     if isjsoncfg
         jdat = loadjson(jsonpath);
-        varargin = [fieldnames(jdat); struct2cell(jdat)];
+        varargin = [fieldnames(jdat), struct2cell(jdat)]';
     end
+    disp(varargin);
+    disp(size(varargin))
     % - Input may also come from the Matlab command line/script or the
     %   shell/Windows command line.
     % - Input is handled differently depending on how it is input and
@@ -97,15 +99,15 @@ function setup_data(varargin)
     % All subjects have the same order
     file_stim_order = fullfile(STIM_DIR, 'picture_namingERP_order.csv');
     file_stim_key = fullfile(STIM_DIR, 'picture_namingERP_key.csv');
-    
+
     stim_order = readtable(file_stim_order);
     stim_key = readtable(file_stim_key);
-% 
+%
 %     fid = fopen(file_stim_order);
 %     [~] = textscan(fid,'%s %s %s',1,'Delimiter',','); % stim_order_head
 %     stim_order = textscan(fid,'%d %d %d','Delimiter',',');
 %     fclose(fid);
-% 
+%
 %     fid = fopen(file_stim_key);
 %     [~] = textscan(fid,'%s %s',1,'Delimiter',','); % stim_key_head
 %     stim_key = textscan(fid,'%d %s','Delimiter',',');
@@ -134,6 +136,17 @@ function setup_data(varargin)
     ELECTRODE = mat2cell(electrode,cell2mat(x(:,2)),1);
 
     %% Prep metadata structure
+    %DATA = [];
+    %if ~isnumeric(SUBJECTS)
+    %    tmp = SUBJECTS;
+    %    SUBJECTS = [tmp.SUBJECT];
+    %    DATA = {tmp.DATA};
+    %end
+    if isempty(Pt)
+      DATA = [];
+    else
+      DATA = Pt;
+    end
     metadata = struct(...
       'subject',num2cell(SUBJECTS),...
       'targets',struct(),...
@@ -261,6 +274,50 @@ function setup_data(varargin)
             filelist(12).sessions = {1:4};
             filelist(12).sessiontag = 'nam_%02d';
         case 'ref'
+            % Subject 1
+            filelist(1).filename = 'namingERP_Pt01_refD14.mat';
+            filelist(1).variables = {'namingERP_data_PtYK_Pt01_refD14'};
+            filelist(1).sessions = {1:4};
+            filelist(1).sessiontag = 'tag_ss%02d_all';
+            % Subject 2
+            % NOT DEFINED
+            %
+            % Subject 3
+            % NOT DEFINED
+            %
+            % Subject 4
+            filelist(4).filename = 'namingERP_Pt4_MA_REF.mat';
+            filelist(4).variables = {'namingERP_data_ss01ss02_REF4', 'namingERP_data_ss03ss04_REF4'};
+            filelist(4).sessions = {1:2,3:4};
+            filelist(4).sessiontag = 'tag_ss%02d';
+            % Subject 5
+            filelist(5).filename = 'namingERP_Pt05_ref02.mat';
+            filelist(5).variables = {'namingERP_data_Pt05_ref02'};
+            filelist(5).sessions = {1:4};
+            filelist(5).sessiontag = 'tag_ss%02d';
+            % Subject 6
+            filelist(6).filename = 'Pt06_namingERP_REF.mat';
+            filelist(6).variables = {'Pt06_namingERP_anony_REF'};
+            filelist(6).sessions = {1:4};
+            filelist(6).sessiontag = 'tag%02d_all';
+            % Subject 7
+            filelist(7).filename = 'namingERPdata_Pt07_ref02.mat';
+            filelist(7).variables = {'namingERPdataPt07_ss0102_ref02','namingERPdataPt07_ss0304_ref02'};
+            filelist(7).sessions = {1:2,3:4};
+            filelist(7).sessiontag = 'Tag_ss%02d';
+            % Subject 8
+            filelist(8).filename = 'namingERPdata_Pt08_ref03.mat';
+            filelist(8).variables = {'namingERPdataPt08_ref03'};
+            filelist(8).sessions = {1:4};
+            filelist(8).sessiontag = 'tag_%02d';
+            % Subject 9
+            % NOT DEFINED
+            %
+            % Subject 10
+            filelist(10).filename = 'namingERPdata_Pt10_ref02.mat';
+            filelist(10).variables = {'namingERPdataPt10_ref02'};
+            filelist(10).sessions = {1:4};
+            filelist(10).sessiontag = 'tagall%02d';
         %     filelist_ref = {...
         %       'namingERP_Pt01_refD14.mat',{'namingERP_data_PtYK_Pt01_refD14'},{[1,2,3,4]},'tag_ss%02d_all';...
         %       [],[],[],[];...
@@ -287,9 +344,13 @@ function setup_data(varargin)
         dpath_out = fullfile(DATA_DIR_OUT, sprintf('s%02d_%s.mat',SUBJECTS(iSubject),DATACODE));
         spath = fullfile(DATA_DIR,DATACODE,sdir,F.filename);
         fprintf('Loading %s...\n', spath);
-        if isempty(Pt)
-            Pt = load(spath);
-        end
+        %if isempty(Pt)
+            if isempty(DATA)
+                Pt = load(spath);
+            else
+                Pt = DATA{iSubject};
+            end
+        %end
 
         nChunks = numel(F.variables);
         if nChunks > 1
@@ -339,19 +400,19 @@ function setup_data(varargin)
         edata = cellstr(Pt.LFP.DIM(2).label);
         zc = ismember(ecoord, edata);
         ecoord = ecoord(zc);
-        
+
         ntp = (WindowSizeInMilliseconds / BoxCarSize);
         xyz = XYZ{SUBJECTS(iSubject)}(zc,:);
         xyzc = mat2cell(xyz, ones(size(xyz,1),1), size(xyz,2));
         xyzcm = repmat(xyzc(:)', ntp, 1);
         xyzcv = xyzcm(:);
         xyz_repeated = cell2mat(xyzcv);
-        
+
         trode = ELECTRODE{SUBJECTS(iSubject)}(zc);
         trodecm = repmat(trode(:)', ntp, 1);
         trodecv = trodecm(:);
         trode_repeated = cell2mat(trodecv);
-        
+
         COORDS = struct('orientation','mni','labels',{trode_repeated},'ijk',[],'ind',[],'xyz',xyz_repeated);
 
         tagfmt = F.sessiontag;
@@ -399,7 +460,7 @@ function setup_data(varargin)
         [~,reduxFilter] = removeOutliers(X);
         y = COORDS.xyz(:,2);
         m = median(y);
-        
+
         M = selectbyfield(metadata, 'subject', SUBJECTS(iSubject));
         M = registerFilter(M, 'rowfilter', 1, reduxFilter.words);
         M = registerFilter(M, 'colfilter', 2, reduxFilter.voxels);
@@ -435,6 +496,7 @@ function setup_data(varargin)
                 fprintf('Metadata written to %s\n', metapathout);
             end
         end
+        Pt = [];
     end
     %% Save metadata
     if ~WriteIndividualMetadata
@@ -488,7 +550,7 @@ function p = parse_from_matlab_or_json(varargin)
     addParameter(p, 'WindowStart',[]);
     addParameter(p, 'WindowSize',[]);
     addParameter(p, 'BaselineWindow',0);
-    addParameter(p, 'subjects', [1:3,5,7:10], @isnumeric);
+    addParameter(p, 'subjects', [1:3,5,7:10]);
     addParameter(p, 'boxcar', 10, @isscalar);
     addParameter(p, 'slope_interval', 0, @isscalar);
     addParameter(p, 'average', 1);
@@ -506,7 +568,7 @@ function p = parse_from_matlab_or_json(varargin)
     end
     if isempty(p.Results.WindowSize)
         error('A window size must be provided.');
-    end 
+    end
 end
 
 function p = parse_from_terminal(varargin)
